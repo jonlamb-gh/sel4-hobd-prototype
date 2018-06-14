@@ -17,6 +17,8 @@ ApplyData61ElfLoaderSettings()
 
 add_executable(
     hobd-system
+    src/root_task.c
+    src/thread.c
     src/main.c)
 
 add_config_library(
@@ -35,10 +37,14 @@ target_compile_options(
     PRIVATE
     -Wall
     -Wextra
+    -Wshadow
     -Wno-unused-parameter
     -Wwrite-strings
     -Wstrict-prototypes
+    -Wold-style-definition
+    -Wnested-externs
 #    -Wmissing-include-dirs
+    -Wno-unused-result
     -Werror)
 
 target_include_directories(

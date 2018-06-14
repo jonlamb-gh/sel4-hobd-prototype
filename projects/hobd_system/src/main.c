@@ -1,76 +1,98 @@
+/**
+ * @file main.c
+ * @brief TODO.
+ *
+ */
+
 #include <autoconf.h>
 
 #include <stdio.h>
-#include <assert.h>
 #include <string.h>
+#include <stdint.h>
 
+#include <sel4/sel4.h>
+#include <vka/vka.h>
+#include <vka/object.h>
+#include <vka/object_capops.h>
 #include <allocman/bootstrap.h>
 #include <allocman/vka.h>
 #include <simple/simple.h>
 #include <simple-default/simple-default.h>
-#include <sel4debug/debug.h>
-
 #include <sel4platsupport/platsupport.h>
 #include <sel4platsupport/io.h>
-
 #include <sel4utils/vspace.h>
 #include <sel4utils/page_dma.h>
+#include <sel4utils/thread.h>
+#include <sel4debug/debug.h>
 #include <platsupport/io.h>
-
 #include <utils/io.h>
+#include <utils/zf_log.h>
+#include <sel4utils/sel4_zf_logif.h>
 
-static seL4_BootInfo *info;
-static simple_t simple;
-static vka_t vka;
-static allocman_t *allocman;
-static vspace_t vspace;
+#include "root_task.h"
+#include "thread.h"
 
-static sel4utils_alloc_data_t alloc_data;
-
+/* 32 * 4K = 128K */
 #define MEM_POOL_SIZE ((1 << seL4_PageBits) * 32)
-static char mem_pool[MEM_POOL_SIZE];
 
-int main(int argc, char **argv)
+/* arbitrary (but unique) number for a badge */
+#define EP_BADGE (0x61)
+
+static root_task_s g_root_task;
+static char g_mem_pool[MEM_POOL_SIZE];
+
+static thread_s g_thread;
+
+static void example_thread(
+        void *arg0,
+        void *arg1,
+        void *ipc_buffer_vaddr)
 {
-    int error;
+    printf("\nhello from thread\n");
+    printf(
+            "arg0 = %p, arg1 = %p, ipc_buffer = %p\n\n",
+            arg0,
+            arg1,
+            ipc_buffer_vaddr);
+}
 
-    /* get boot info */
-    info = platsupport_get_bootinfo();
-    assert(info != NULL);
+int main(
+        int argc,
+        char **argv)
+{
+    memset(&g_root_task, 0, sizeof(g_root_task));
+    memset(&g_thread, 0, sizeof(g_thread));
 
-    /* name this thread */
-    seL4_DebugNameThread(seL4_CapInitThreadTCB, "hobd-system");
-
-    /* init simple */
-    simple_default_init_bootinfo(&simple, info);
-
-    /* print out bootinfo and other info about simple */
-    simple_print(&simple);
-
-    /* create an allocator */
-    allocman = bootstrap_use_current_simple(
-            &simple,
+    /* create the root task */
+    root_task_init(
             MEM_POOL_SIZE,
-            mem_pool);
-    assert(allocman != NULL);
+            &g_mem_pool[0],
+            &g_root_task);
 
-    /* create a vka (interface for interacting with the underlying allocator) */
-    allocman_make_vka(&vka, allocman);
+    ZF_LOGD("root-task is initialized");
 
-    /* create a vspace object to manage our vspace */
-    error = sel4utils_bootstrap_vspace_with_bootinfo_leaky(
-            &vspace,
-            &alloc_data,
-            // ./kernel/libsel4/include/sel4/bootinfo_types.h
-            //seL4_CapInitThreadPD,
-            simple_get_pd(&simple),
-            &vka,
-            info);
-    assert(error == 0);
+    /* create a new thread */
+    thread_create(
+            "example-thread",
+            EP_BADGE,
+            &g_root_task,
+            &g_thread);
 
-    printf("\n\nhello from seL4 - halting now\n\n");
+    /* start the new thread */
+    thread_start(
+            &example_thread,
+            NULL,
+            NULL,
+            &g_thread);
 
-    /* intentional halt */
+    /* loop forever, servicing events/faults/etc */
+    while(1)
+    {
+        /* forfeit the remainder of our timeslice */
+        seL4_Yield();
+    }
+
+    /* should not get here, intentional halt */
     seL4_DebugHalt();
 
     return 0;
