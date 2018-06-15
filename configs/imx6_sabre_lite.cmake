@@ -17,6 +17,7 @@ set(LibSel4PlatSupportUseDebugPutChar true CACHE BOOL "")
 
 set(KernelMaxNumNodes "1" CACHE STRING "")
 set(KernelNumDomains 1 CACHE STRING "")
-set(KernelMaxNumBootinfoUntypedCap 166 CACHE STRING "")
+set(KernelMaxNumBootinfoUntypedCap 200 CACHE STRING "")
 set(KernelRetypeFanOutLimit "256" CACHE STRING "")
 set(LibSel4UtilsStackSize "32768" CACHE STRING "" FORCE)
+set(LibSel4UtilsCSpaceSizeBits "17" CACHE STRING "" FORCE)

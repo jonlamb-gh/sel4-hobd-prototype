@@ -23,9 +23,13 @@ typedef struct
     allocman_t *allocman;
     vspace_t vspace;
     sel4utils_alloc_data_t alloc_data;
+    reservation_t virt_reservation;
+    vka_object_t global_fault_ep_obj;
+    seL4_CPtr global_fault_ep;
 } root_task_s;
 
 void root_task_init(
+        const uint32_t virt_pool_size,
         const uint32_t mem_pool_size,
         char * const mem_pool,
         root_task_s * const root_task);
