@@ -18,7 +18,7 @@
 //#include <sel4utils/sel4_zf_logif.h>
 #include <sel4debug/debug.h>
 
-#include "root_task.h"
+#include "init_env.h"
 #include "thread.h"
 
 void thread_create(
@@ -27,24 +27,24 @@ void thread_create(
         const uint32_t stack_size,
         uint64_t * const stack,
         const thread_run_function_type thread_fn,
-        root_task_s * const root_task,
+        init_env_s * const env,
         thread_s * const thread)
 {
     int err;
 
     /* get our vspace root page directory */
-    const seL4_CPtr pd_cap = simple_get_pd(&root_task->simple);
+    const seL4_CPtr pd_cap = simple_get_pd(&env->simple);
 
     /* root of the cspace to start the thread in */
-    const seL4_CNode cspace_cap = simple_get_cnode(&root_task->simple);
+    const seL4_CNode cspace_cap = simple_get_cnode(&env->simple);
 
     /* create a new TCB */
-    err = vka_alloc_tcb(&root_task->vka, &thread->tcb_object);
+    err = vka_alloc_tcb(&env->vka, &thread->tcb_object);
     ZF_LOGF_IF(err != 0, "Failed to allocate new TCB\n");
 
     /* get a frame cap for the IPC buffer */
     err = vka_alloc_frame(
-            &root_task->vka,
+            &env->vka,
             THREAD_IPC_BUFFER_FRAME_SIZE_BITS,
             &thread->ipc_frame_object);
     ZF_LOGF_IF(err != 0, "Failed to allocate a frame for the IPC buffer\n");
@@ -52,7 +52,7 @@ void thread_create(
     /* create a IPC buffer and capability for it */
     seL4_CPtr ipc_pd_cap = 0;
     seL4_IPCBuffer * const ipc_buffer = (seL4_IPCBuffer*) vspace_new_ipc_buffer(
-            &root_task->vspace,
+            &env->vspace,
             &ipc_pd_cap);
     assert(ipc_buffer != NULL);
 
@@ -62,7 +62,7 @@ void thread_create(
     /* allocate a cspace slot for the fault endpoint */
     seL4_CPtr fault_ep = 0;
     err = vka_cspace_alloc(
-            &root_task->vka,
+            &env->vka,
             &fault_ep);
     ZF_LOGF_IF(err != 0, "Failed to allocate thread fault endpoint\n");
 
@@ -74,7 +74,7 @@ void thread_create(
             fault_ep,
             seL4_WordBits,
             seL4_CapInitThreadCNode,
-            root_task->global_fault_ep,
+            env->global_fault_ep,
             seL4_WordBits,
             seL4_AllRights,
             ipc_badge);
@@ -133,6 +133,19 @@ void thread_set_priority(
             seL4_CapInitThreadTCB,
             seL4_MaxPrio);
     ZF_LOGF_IF(err != 0, "Failed to set thread priority\n");
+}
+
+void thread_set_affinity(
+        const seL4_Word affinity,
+        thread_s * const thread)
+{
+    /* set affinity */
+#if CONFIG_MAX_NUM_NODES > 1
+    const int err = seL4_TCB_SetAffinity(
+            thread->tcb_object.cptr,
+            affinity);
+    ZF_LOGF_IF(err != 0, "Failed to set thread's affinity\n");
+#endif
 }
 
 void thread_start(

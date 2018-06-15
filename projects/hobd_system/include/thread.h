@@ -13,7 +13,7 @@
 #include <vka/object_capops.h>
 #include <vspace/vspace.h>
 
-#include "root_task.h"
+#include "init_env.h"
 
 /* use a 4K frame for the IPC buffer */
 #define THREAD_IPC_BUFFER_FRAME_SIZE_BITS (12)
@@ -33,11 +33,15 @@ void thread_create(
         const uint32_t stack_size,
         uint64_t * const stack,
         const thread_run_function_type thread_fn,
-        root_task_s * const root_task,
+        init_env_s * const env,
         thread_s * const thread);
 
 void thread_set_priority(
         const int priority,
+        thread_s * const thread);
+
+void thread_set_affinity(
+        const seL4_Word affinity,
         thread_s * const thread);
 
 void thread_start(

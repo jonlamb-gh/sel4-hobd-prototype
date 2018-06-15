@@ -17,6 +17,8 @@ ApplyData61ElfLoaderSettings()
 
 add_executable(
     hobd-system
+    modules/hobd/src/hobd_module.c
+    src/platform.c
     src/root_task.c
     src/thread.c
     src/main.c)
@@ -50,6 +52,7 @@ target_compile_options(
 target_include_directories(
     hobd-system
     PRIVATE
+    modules/hobd/include
     include)
 
 target_link_libraries(
