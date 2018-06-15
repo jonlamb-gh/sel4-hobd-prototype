@@ -60,11 +60,14 @@ int main(
     hobd_module_init(&env);
 
 #ifdef CONFIG_DEBUG_BUILD
-    ZF_LOGD("Dumping scheduler");
+    /* could make a debug routine to walk each core and call dump? */
+    ZF_LOGD("Dumping scheduler (only core 0 TCB's will be displayed)");
     printf("\n");
     seL4_DebugDumpScheduler();
     printf("\n");
 #endif
+
+    /* TODO - global sync-start mutex ? */
 
     /* loop forever, servicing events/faults/etc */
     while(1)
