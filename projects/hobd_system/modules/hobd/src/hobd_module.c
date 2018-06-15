@@ -92,7 +92,7 @@ void hobd_module_init(
             8,
             PARITY_NONE,
             1);
-    ZF_LOGF_IF(char_dev == NULL, "Failed to configure serial port\n");
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
 
     /* create a new thread */
     thread_create(
