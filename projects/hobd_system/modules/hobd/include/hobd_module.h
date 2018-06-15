@@ -9,6 +9,9 @@
 
 #include <stdint.h>
 
-// TODO
+#include "init_env.h"
+
+void hobd_module_init(
+        init_env_s * const env);
 
 #endif /* HOBD_MODULE_H */
