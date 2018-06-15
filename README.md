@@ -16,6 +16,15 @@ cd build/
 ../scripts/build
 ```
 
+## SMP / Multicore
+
+Add this to the generated `simulate` script if
+simulating (note that it must be >= `KernelMaxNumNodes`):
+
+```base
+-smp cores=4
+```
+
 ## Output
 
 ```bash
@@ -29,6 +38,7 @@ ELF-loading image 'hobd-system'
   paddr=[10033000..101a9fff]
   vaddr=[10000..186fff]
   virt_entry=3ced4
+Bringing up 3 other cpus
 Enabling MMU and paging
 Jumping to kernel-image entry point...
 

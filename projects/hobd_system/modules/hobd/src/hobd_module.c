@@ -39,6 +39,11 @@ static void thread_fn(void)
     /* prefix the logger with task name */
     zf_log_set_tag_prefix(THREAD_NAME);
 
+    /* TODO - delay for a short period */
+    unsigned long i;
+    for(i = 0; i < 0xFFFFF; i++)
+        seL4_Yield();
+
     ZF_LOGW("thread is running, about to intentionally fault");
 
     /* fault */
@@ -121,7 +126,7 @@ void hobd_module_init(
 
     /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
-    thread_set_affinity(1, &g_thread);
+    thread_set_affinity(0, &g_thread);
 
     ZF_LOGD("%s is initialized", THREAD_NAME);
 
