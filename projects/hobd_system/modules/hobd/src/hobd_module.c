@@ -13,6 +13,8 @@
 #include <platsupport/io.h>
 #include <platsupport/mux.h>
 #include <platsupport/gpio.h>
+#include <platsupport/chardev.h>
+#include <platsupport/serial.h>
 
 #include "init_env.h"
 #include "thread.h"
@@ -27,6 +29,7 @@
 /* size of the thread's stack in words */
 #define THREAD_STACK_SIZE (512)
 
+static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
 static uint64_t g_thread_stack[THREAD_STACK_SIZE];
@@ -51,6 +54,7 @@ void hobd_module_init(
 
     (void) memset(&g_thread, 0, sizeof(g_thread));
     (void) memset(&g_gpio_sys, 0, sizeof(g_gpio_sys));
+    (void) memset(&g_char_dev, 0, sizeof(g_char_dev));
 
     /* initialize the MUX subsytem */
     err = mux_sys_init(
@@ -65,7 +69,7 @@ void hobd_module_init(
             &g_gpio_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem\n");
 
-    /* TODO - test out a port/pin combo */
+    /* TODO - this is just a random port/pin combo */
     gpio_t gpio;
     err = gpio_new(
             &g_gpio_sys,
@@ -73,6 +77,22 @@ void hobd_module_init(
             GPIO_DIR_OUT,
             &gpio);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
+
+    /* initialize character device - PS_SERIAL0 = IMX_UART1 */
+    const ps_chardevice_t * const char_dev = ps_cdev_init(
+            PS_SERIAL0,
+            &env->io_ops,
+            &g_char_dev);
+    ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device\n");
+
+    /* line configuration of serial port */
+    err = serial_configure(
+            &g_char_dev,
+            115200,
+            8,
+            PARITY_NONE,
+            1);
+    ZF_LOGF_IF(char_dev == NULL, "Failed to configure serial port\n");
 
     /* create a new thread */
     thread_create(
@@ -86,6 +106,8 @@ void hobd_module_init(
 
     /* set thread priority */
     thread_set_priority(seL4_MaxPrio, &g_thread);
+
+    ZF_LOGD("%s is initialized", THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);
