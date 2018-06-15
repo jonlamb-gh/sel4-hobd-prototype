@@ -128,7 +128,7 @@ void hobd_module_init(
 
     /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
-    thread_set_affinity(1, &g_thread);
+    thread_set_affinity(0, &g_thread);
 
     ZF_LOGD("%s is initialized", THREAD_NAME);
 

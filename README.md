@@ -4,7 +4,11 @@ Prototype HOBD system running on seL4
 ## TODO
 
 - Add cmake configs for simulation features
-- Remove hard-coded debugging configs
+- Remove hard-coded debug configs
+
+## Links
+
+- [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
 
 ## Building
 
@@ -17,6 +21,11 @@ cd build/
 ```
 
 ## SMP / Multicore
+
+By default, only a single node/core is used, because the simulate script logic
+does automatically add smp options yet.
+
+CMake config `KernelMaxNumNodes` is in `configs/imx6_sabre_lite.cmake`.
 
 Add this to the generated `simulate` script if
 simulating (note that it must be >= `KernelMaxNumNodes`):
