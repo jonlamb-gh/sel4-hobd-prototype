@@ -40,6 +40,10 @@ void thread_set_priority(
         const int priority,
         thread_s * const thread);
 
+void thread_set_affinity(
+        const seL4_Word affinity,
+        thread_s * const thread);
+
 void thread_start(
         thread_s * const thread);
 

@@ -47,14 +47,12 @@ static void thread_fn(void)
     ZF_LOGI("thread resumed");
 }
 
-void hobd_module_init(
+static void init_gpio(
         init_env_s * const env)
 {
     int err;
 
-    (void) memset(&g_thread, 0, sizeof(g_thread));
     (void) memset(&g_gpio_sys, 0, sizeof(g_gpio_sys));
-    (void) memset(&g_char_dev, 0, sizeof(g_char_dev));
 
     /* initialize the MUX subsytem */
     err = mux_sys_init(
@@ -77,6 +75,14 @@ void hobd_module_init(
             GPIO_DIR_OUT,
             &gpio);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
+}
+
+static void init_uart(
+        init_env_s * const env)
+{
+    int err;
+
+    (void) memset(&g_char_dev, 0, sizeof(g_char_dev));
 
     /* initialize character device - PS_SERIAL0 = IMX_UART1 */
     const ps_chardevice_t * const char_dev = ps_cdev_init(
@@ -93,6 +99,15 @@ void hobd_module_init(
             PARITY_NONE,
             1);
     ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
+}
+
+void hobd_module_init(
+        init_env_s * const env)
+{
+    (void) memset(&g_thread, 0, sizeof(g_thread));
+
+    init_gpio(env);
+    init_uart(env);
 
     /* create a new thread */
     thread_create(
@@ -104,8 +119,9 @@ void hobd_module_init(
             env,
             &g_thread);
 
-    /* set thread priority */
+    /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_affinity(1, &g_thread);
 
     ZF_LOGD("%s is initialized", THREAD_NAME);
 

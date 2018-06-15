@@ -23,6 +23,23 @@
 
 #define IMX6_MAX_FREQ (996 * MHZ)
 
+static void init_clock(
+        init_env_s * const env)
+{
+    int err;
+    clock_sys_t clock = {0};
+
+    err = clock_sys_init(&env->io_ops, &clock);
+    ZF_LOGF_IF(err != 0, "Failed to initialize clock");
+
+    clk_t * const clock_ref = clk_get_clock(&clock, CLK_ARM);
+    ZF_LOGF_IF(clock_ref == NULL, "Failed to get CLK_ARM clock");
+
+    /* set to highest cpu freq */
+    const freq_t freq = clk_set_freq(clock_ref, IMX6_MAX_FREQ);
+    ZF_LOGF_IF(freq != IMX6_MAX_FREQ, "Failed to set imx6 clock frequency");
+}
+
 void platform_init(
         init_env_s * const env)
 {
@@ -62,16 +79,8 @@ void platform_init(
             &env->io_ops.dma_manager);
     ZF_LOGF_IF(err != 0, "Failed to create new DMA manager\n");
 
-    clock_sys_t clock = {0};
-    err = clock_sys_init(&env->io_ops, &clock);
-	ZF_LOGF_IF(err != 0, "Failed to initialize clock");
-
-    clk_t * const clock_ref = clk_get_clock(&clock, CLK_ARM);
-    ZF_LOGF_IF(clock_ref == NULL, "Failed to get CLK_ARM clock");
-
-    /* set to highest cpu freq */
-    const freq_t freq = clk_set_freq(clock_ref, IMX6_MAX_FREQ);
-	ZF_LOGF_IF(freq != IMX6_MAX_FREQ, "Failed to set imx6 clock frequency");
+    /* initialize clock, set max frequency */
+    init_clock(env);
 
     ZF_LOGD("Platform is initialized");
 }
