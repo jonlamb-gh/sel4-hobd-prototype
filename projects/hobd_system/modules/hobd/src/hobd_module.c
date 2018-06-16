@@ -30,9 +30,6 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
 static void thread_fn(void)
 {
-    /* prefix the logger with task name */
-    zf_log_set_tag_prefix(HOBDMOD_THREAD_NAME);
-
     /* wait for system ready */
     system_module_wait_for_start();
 
@@ -120,7 +117,7 @@ void hobd_module_init(
 
     /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
-    thread_set_affinity(0, &g_thread);
+    thread_set_affinity(HOBDMOD_THREAD_AFFINITY, &g_thread);
 
     ZF_LOGD("%s is initialized", HOBDMOD_THREAD_NAME);
 

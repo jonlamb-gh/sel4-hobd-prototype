@@ -35,9 +35,6 @@ static void thread_fn(void)
 {
     int err;
 
-    /* prefix the logger with task name */
-    zf_log_set_tag_prefix(SYSMOD_THREAD_NAME);
-
     /* setup the system-ready mutex mechanism */
     if(g_is_init == 0)
     {

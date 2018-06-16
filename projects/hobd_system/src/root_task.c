@@ -36,9 +36,6 @@ void root_task_init(
 {
     int err;
 
-    /* prefix the logger with task name */
-    zf_log_set_tag_prefix(ROOT_THREAD_NAME);
-
     /* get boot info */
     env->boot_info = platsupport_get_bootinfo();
     ZF_LOGF_IF(env->boot_info == NULL, "Failed to get bootinfo\n");

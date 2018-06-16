@@ -77,37 +77,37 @@ init debug_print_bootinfo@bootinfo.c:44 0x101ac000 | 14 | 0
 2 untypeds of size 27
 ------------------------------
 
-init platform_init@platform.c:89 Platform is initialized
-init root_task_init@root_task.c:108 Created global fault ep 0x27B
-init root_task_init@root_task.c:110 Root task is initialized
-init thread_create@thread.c:69 Minting fault ep 0x2A0 for thread 'sys'
-init thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
-init system_module_init@system_module.c:89 sys is initialized
-init thread_create@thread.c:69 Minting sys thread_fn@system_module.c:47 System ready to start
-sys signal_ready_to_start@system_module.c:31 System starting
-fault ep 0x2E5 for thread 'hobd'
-sys thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
-sys hobd_module_init@hobd_module.c:125 hobd is initialized
-sys debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
+platform_init@platform.c:89 Platform is initialized
+root_task_init@root_task.c:105 Created global fault ep 0x27B
+root_task_init@root_task.c:107 Root task is initialized
+thread_create@thread.c:69 Minting fault ep 0x2A0 for thread 'sys'
+thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
+system_module_init@system_module.c:86 sys is initialized
+thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'hobd'
+thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
+hobd_module_init@hobd_module.c:122 hobd is initialized
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
 hobd                                            restart         0x103e8 255                     0
-sys                                             running         0x10c1c 255                     0
+sys                                             restart         0x11f30 255                     0
 idle_thread                                     idle            (nil)   0                       0
-init                                            running         0x16238 255                     0
+init                                            running         0x16214 255                     0
 
-hobd thread_fn@hobd_module.c:40 thread is running, about to intentionally fault
-hobd main@main.c:82 Received fault on ep 0x27B - badge 0x21
-Pagefault from [fault-handler]: write fault at PC: 0x10460 vaddr: 0xdeadbeef, FSR 0x805
-hobd debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
+thread_fn@system_module.c:44 System ready to start
+signal_ready_to_start@system_module.c:31 System starting
+thread_fn@hobd_module.c:37 thread is running, about to intentionally fault
+main@main.c:82 Received fault on ep 0x27B - badge 0x21
+Pagefault from [fault-handler]: write fault at PC: 0x10454 vaddr: 0xdeadbeef, FSR 0x805
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
-hobd                                            blocked on reply        0x10460 255             0
-sys                                             running         0x10c1c 255                     0
+hobd                                            blocked on reply        0x10454 255             0
+sys                                             running         0x10c10 255                     0
 idle_thread                                     idle            (nil)   0                       0
-init                                            running         0x16238 255                     0
+init                                            running         0x16214 255                     0
 ```
