@@ -65,8 +65,8 @@ int main(
             &env);
 
     /* initialize modules */
-    system_module_init(&env);
     hobd_module_init(&env);
+    system_module_init(&env);
 
     debug_dump_scheduler();
 

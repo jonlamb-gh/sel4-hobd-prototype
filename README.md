@@ -80,19 +80,19 @@ init debug_print_bootinfo@bootinfo.c:44 0x101ac000 | 14 | 0
 platform_init@platform.c:89 Platform is initialized
 root_task_init@root_task.c:105 Created global fault ep 0x27B
 root_task_init@root_task.c:107 Root task is initialized
-thread_create@thread.c:69 Minting fault ep 0x2A0 for thread 'sys'
-thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
-system_module_init@system_module.c:86 sys is initialized
-thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'hobd'
+thread_create@thread.c:69 Minting fault ep 0x2B4 for thread 'hobd'
 thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
 hobd_module_init@hobd_module.c:122 hobd is initialized
+thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'sys'
+thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
+system_module_init@system_module.c:86 sys is initialized
 debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
-hobd                                            restart         0x103e8 255                     0
 sys                                             restart         0x11f30 255                     0
+hobd                                            restart         0x103e8 255                     0
 idle_thread                                     idle            (nil)   0                       0
 init                                            running         0x16214 255                     0
 
@@ -106,8 +106,8 @@ debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displ
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
-hobd                                            blocked on reply        0x10454 255             0
 sys                                             running         0x10c10 255                     0
+hobd                                            blocked on reply        0x10454 255             0
 idle_thread                                     idle            (nil)   0                       0
 init                                            running         0x16214 255                     0
 ```

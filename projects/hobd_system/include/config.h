@@ -8,6 +8,8 @@
  *
  */
 
+/* TODO - add thread priority */
+
 #ifndef CONFIG_H
 #define CONFIG_H
 
