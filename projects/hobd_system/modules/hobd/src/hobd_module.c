@@ -15,38 +15,30 @@
 #include <platsupport/gpio.h>
 #include <platsupport/chardev.h>
 #include <platsupport/serial.h>
+#include <platsupport/delay.h>
 
+#include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "system_module.h"
 #include "hobd_module.h"
-
-/* TODO - move to a config.h ? */
-#define THREAD_NAME "hobd-module"
-
-/* arbitrary (but unique) number for a badge */
-#define EP_BADGE (0x61)
-
-/* size of the thread's stack in words */
-#define THREAD_STACK_SIZE (512)
 
 static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
-static uint64_t g_thread_stack[THREAD_STACK_SIZE];
+static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
 static void thread_fn(void)
 {
     /* prefix the logger with task name */
-    zf_log_set_tag_prefix(THREAD_NAME);
+    zf_log_set_tag_prefix(HOBDMOD_THREAD_NAME);
 
-    /* TODO - delay for a short period */
-    unsigned long i;
-    for(i = 0; i < 0xFFFFF; i++)
-    {
-        seL4_Yield();
-    }
+    /* wait for system ready */
+    system_module_wait_for_start();
 
+    /* TODO - delay for a short period then fault */
     ZF_LOGW("thread is running, about to intentionally fault");
+    ps_sdelay(1);
 
     /* fault */
     *((char*)0xDEADBEEF) = 0;
@@ -116,10 +108,10 @@ void hobd_module_init(
     init_gpio(env);
     init_uart(env);
 
-    /* create a new thread */
+    /* create a worker thread */
     thread_create(
-            THREAD_NAME,
-            EP_BADGE,
+            HOBDMOD_THREAD_NAME,
+            HOBDMOD_EP_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &thread_fn,
@@ -130,7 +122,7 @@ void hobd_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(0, &g_thread);
 
-    ZF_LOGD("%s is initialized", THREAD_NAME);
+    ZF_LOGD("%s is initialized", HOBDMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);
