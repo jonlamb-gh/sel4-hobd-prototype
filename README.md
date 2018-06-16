@@ -9,6 +9,8 @@ Prototype HOBD system running on seL4
 ## Links
 
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
+- [CMake config for this project](configs/imx6_sabre_lite.cmake)
+- [Main project root dir](projects/hobd_system)
 
 ## Building
 
