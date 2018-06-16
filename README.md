@@ -86,7 +86,7 @@ system_module_init@system_module.c:86 sys is initialized
 thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'hobd'
 thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
 hobd_module_init@hobd_module.c:122 hobd is initialized
-debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
@@ -101,7 +101,7 @@ signal_ready_to_start@system_module.c:31 System starting
 thread_fn@hobd_module.c:37 thread is running, about to intentionally fault
 main@main.c:82 Received fault on ep 0x27B - badge 0x21
 Pagefault from [fault-handler]: write fault at PC: 0x10454 vaddr: 0xdeadbeef, FSR 0x805
-debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCB's will be displayed)
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core

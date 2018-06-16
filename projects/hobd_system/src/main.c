@@ -44,7 +44,7 @@ static void debug_dump_scheduler(void)
 {
 #ifdef CONFIG_DEBUG_BUILD
     /* could make a debug routine to walk each core and call dump? */
-    ZF_LOGD("Dumping scheduler (only core 0 TCB's will be displayed)");
+    ZF_LOGD("Dumping scheduler (only core 0 TCBs will be displayed)");
     printf("\n");
     seL4_DebugDumpScheduler();
     printf("\n");
