@@ -26,9 +26,9 @@
 
 /* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
  * doesn't seem to support all the GPIOs */
-/* CSI0_DAT10, UART1_TX_DATA, GPIO5_IO28*/
-//#define UART_TX_PORT (GPIO_BANK5)
-//#define UART_TX_PIN (28)
+/* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 */
+//#define UART_TX_PORT (GPIO_BANK6)
+//#define UART_TX_PIN (17)
 #define UART_TX_PORT (GPIO_BANK1)
 #define UART_TX_PIN (1)
 

@@ -50,6 +50,7 @@ CSI0_DAT10 | ALT3 | UART1_TX_DATA
 CSI0_DAT11 | ALT3 | UART1_RX_DATA
            | ALT5 | GPIO5_IO29
 
+# Sabre Lite uses these on the connector for UART1
 SD3_DAT7 | ALT1 | UART1_TX_DATA
          | ALT5 | GPIO6_IO17
 SD3_DAT6 | ALT1 | UART1_RX_DATA
