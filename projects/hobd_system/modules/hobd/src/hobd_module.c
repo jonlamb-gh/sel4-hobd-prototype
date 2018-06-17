@@ -21,26 +21,77 @@
 #include "init_env.h"
 #include "thread.h"
 #include "system_module.h"
+#include "hobd_kline.h"
 #include "hobd_module.h"
+
+/* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
+ * doesn't seem to support all the GPIOs */
+/* CSI0_DAT10, UART1_TX_DATA, GPIO5_IO28*/
+//#define UART_TX_PORT (GPIO_BANK5)
+//#define UART_TX_PIN (28)
+#define UART_TX_PORT (GPIO_BANK1)
+#define UART_TX_PIN (1)
 
 static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
 static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
+static void hobd_kline_reset_seq(
+        gpio_t * const gpio)
+{
+    int err;
+
+    /* pull k-line low for 70 ms */
+    err = gpio_clr(gpio);
+    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO\n");
+
+    ps_mdelay(70);
+
+    /* return to high, wait 120 ms */
+    err = gpio_set(gpio);
+    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO\n");
+
+    ps_mdelay(120);
+
+    /* TODO - send msg */
+}
+
 static void thread_fn(void)
 {
+    int err;
+    gpio_t uart_tx_gpio;
+
     /* wait for system ready */
     system_module_wait_for_start();
 
-    /* TODO - delay for a short period then fault */
-    ZF_LOGW("thread is running, about to intentionally fault");
-    ps_sdelay(1);
+    /* TODO - disable char dev ? */
 
-    /* fault */
-    *((char*)0xDEADBEEF) = 0;
+    /* initialize UART TX GPIO */
+    err = gpio_new(
+            &g_gpio_sys,
+            GPIOID(UART_TX_PORT, UART_TX_PIN),
+            GPIO_DIR_OUT,
+            &uart_tx_gpio);
+    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
 
-    ZF_LOGI("thread resumed");
+    ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
+
+    /* perform the init sequence */
+    hobd_kline_reset_seq(&uart_tx_gpio);
+
+    while(1)
+    {
+        const int data = ps_cdev_getchar(&g_char_dev);
+
+        if(data >= 0)
+        {
+            ZF_LOGD("got data: 0x%02X", (unsigned int) data);
+        }
+    }
+
+    /* should not get here, intentional halt */
+    seL4_DebugHalt();
 }
 
 static void init_gpio(
@@ -50,27 +101,18 @@ static void init_gpio(
 
     (void) memset(&g_gpio_sys, 0, sizeof(g_gpio_sys));
 
-    /* initialize the MUX subsytem */
+    /* initialize the MUX subsystem */
     err = mux_sys_init(
             &env->io_ops,
             NULL,
             &env->io_ops.mux_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize MUX subsystem\n");
 
-    /* initialize the GPIO subsytem */
+    /* initialize the GPIO subsystem */
     err = gpio_sys_init(
             &env->io_ops,
             &g_gpio_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem\n");
-
-    /* TODO - this is just a random port/pin combo */
-    gpio_t gpio;
-    err = gpio_new(
-            &g_gpio_sys,
-            GPIOID(GPIO_BANK1, 1),
-            GPIO_DIR_OUT,
-            &gpio);
-    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
 }
 
 static void init_uart(

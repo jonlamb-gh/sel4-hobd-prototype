@@ -5,10 +5,14 @@ Prototype HOBD system running on seL4
 
 - Add cmake configs for simulation features
 - Remove hard-coded debug configs
+- Add MUX support for the `UART1_TX_DATA` GPIO
 
 ## Links
 
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
+- [HW user manual](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/SABRE_Lite_Hardware_Manual_rev11.pdf)
+- [HW components](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/sabre_lite-revD.pdf)
+- [GPIO mapping guide](https://www.kosagi.com/w/index.php?title=Definitive_GPIO_guide)
 - [CMake config for this project](configs/imx6_sabre_lite.cmake)
 - [Main project root dir](projects/hobd_system)
 
@@ -34,6 +38,22 @@ simulating (note that it must be >= `KernelMaxNumNodes`):
 
 ```base
 -smp cores=4
+```
+
+Affinity for the threads used in this project are in [config.h](projects/hobd_system/include/config.h).
+
+## GPIO
+
+```bash
+CSI0_DAT10 | ALT3 | UART1_TX_DATA
+           | ALT5 | GPIO5_IO28
+CSI0_DAT11 | ALT3 | UART1_RX_DATA
+           | ALT5 | GPIO5_IO29
+
+SD3_DAT7 | ALT1 | UART1_TX_DATA
+         | ALT5 | GPIO6_IO17
+SD3_DAT6 | ALT1 | UART1_RX_DATA
+         | ALT5 | GPIO6_IO18
 ```
 
 ## Output

@@ -20,6 +20,8 @@
 #include <platsupport/delay.h>
 #include <utils/frequency.h>
 
+#include "config.h"
+#include "init_env.h"
 #include "platform.h"
 
 #define IMX6_MAX_FREQ (996 * MHZ)
