@@ -77,8 +77,19 @@ static void thread_fn(void)
 
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
+    /* TODO - reorganize this more */
+
     /* perform the init sequence */
     hobd_kline_reset_seq(&uart_tx_gpio);
+
+    /* reconfigure the serial port */
+    err = serial_configure(
+            &g_char_dev,
+            115200,
+            8,
+            PARITY_NONE,
+            1);
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
 
     while(1)
     {
@@ -118,8 +129,6 @@ static void init_gpio(
 static void init_uart(
         init_env_s * const env)
 {
-    int err;
-
     (void) memset(&g_char_dev, 0, sizeof(g_char_dev));
 
     /* initialize character device - PS_SERIAL0 = IMX_UART1 */
@@ -128,15 +137,6 @@ static void init_uart(
             &env->io_ops,
             &g_char_dev);
     ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device\n");
-
-    /* line configuration of serial port */
-    err = serial_configure(
-            &g_char_dev,
-            115200,
-            8,
-            PARITY_NONE,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
 }
 
 void hobd_module_init(

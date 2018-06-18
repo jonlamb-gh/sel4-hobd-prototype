@@ -57,6 +57,27 @@ SD3_DAT6 | ALT1 | UART1_RX_DATA
          | ALT5 | GPIO6_IO18
 ```
 
+## QEMU Serial Port
+
+In the generated `simulate` script, replace the first serial config:
+
+```bash
+-serial null
+```
+
+With (for example):
+
+```bash
+-serial telnet:localhost:1235,server
+```
+
+Now on the host machine:
+
+```bash
+# connect to serial port via telnet, data will be forwarded to IMX_UART1
+telnet 127.0.0.1 1235
+```
+
 ## Output
 
 ```bash
