@@ -2,6 +2,8 @@
 
 Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
 
+See the `devel` branch for the most recent developments.
+
 ## TODO
 
 - Add cmake configs for simulation features
