@@ -1,5 +1,6 @@
 # sel4-hobd-prototype
-Prototype HOBD system running on seL4
+
+Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
 
 ## TODO
 
