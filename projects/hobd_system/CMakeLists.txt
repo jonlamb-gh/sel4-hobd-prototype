@@ -17,6 +17,7 @@ ApplyData61ElfLoaderSettings()
 
 add_executable(
     hobd-system
+    modules/hobd/src/hobd_parser.c
     modules/hobd/src/hobd_module.c
     modules/system/src/system_module.c
     src/platform.c

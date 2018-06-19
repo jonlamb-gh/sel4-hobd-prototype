@@ -22,6 +22,7 @@
 #include "thread.h"
 #include "system_module.h"
 #include "hobd_kline.h"
+#include "hobd_parser.h"
 #include "hobd_module.h"
 
 /* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
@@ -32,12 +33,17 @@
 #define UART_TX_PORT (GPIO_BANK1)
 #define UART_TX_PIN (1)
 
+#define HOBD_RX_BUFFER_SIZE (512)
+
 static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
 static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
-static void hobd_kline_reset_seq(
+static hobd_parser_s hobd_parser;
+static uint8_t hobd_rx_buffer[HOBD_RX_BUFFER_SIZE];
+
+static void hobd_kline_init_seq(
         gpio_t * const gpio)
 {
     int err;
@@ -65,6 +71,12 @@ static void thread_fn(void)
     /* wait for system ready */
     system_module_wait_for_start();
 
+    /* initialize the HOBD parser */
+    hobd_parser_init(
+            &hobd_rx_buffer[0],
+            sizeof(hobd_rx_buffer),
+            &hobd_parser);
+
     /* TODO - disable char dev ? */
 
     /* initialize UART TX GPIO */
@@ -80,7 +92,7 @@ static void thread_fn(void)
     /* TODO - reorganize this more once comm. management is implemented */
 
     /* perform the init sequence */
-    hobd_kline_reset_seq(&uart_tx_gpio);
+    hobd_kline_init_seq(&uart_tx_gpio);
 
     /* reconfigure the serial port */
     err = serial_configure(
@@ -93,12 +105,24 @@ static void thread_fn(void)
 
     while(1)
     {
-        /* TODO - parser/etc */
+        /* TODO - better parser, handle bad data/etc */
         const int data = ps_cdev_getchar(&g_char_dev);
 
         if(data >= 0)
         {
             ZF_LOGD("got data: 0x%02X", (unsigned int) data);
+
+            const uint8_t status = hobd_parser_parse_byte(
+                    (uint8_t) data,
+                    &hobd_parser);
+
+            if(status == 0)
+            {
+                const hobd_msg_header_s * const msg =
+                        (hobd_msg_header_s*) &hobd_rx_buffer[0];
+
+                ZF_LOGD("got msg - type: 0x%X", (unsigned int) msg->type);
+            }
         }
     }
 

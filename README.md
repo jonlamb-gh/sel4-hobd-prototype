@@ -82,6 +82,9 @@ Now on the host machine:
 ```bash
 # connect to serial port via telnet, data will be forwarded to IMX_UART1
 telnet 127.0.0.1 1235
+
+# or bash escapes for binary hex data
+echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 ```
 
 ## Output
