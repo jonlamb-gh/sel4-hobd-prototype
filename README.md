@@ -16,6 +16,9 @@ See the `devel` branch for the most recent developments.
 - [HW user manual](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/SABRE_Lite_Hardware_Manual_rev11.pdf)
 - [HW components](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/sabre_lite-revD.pdf)
 - [GPIO mapping guide](https://www.kosagi.com/w/index.php?title=Definitive_GPIO_guide)
+- [Honda OBD Data tables](http://projects.gonzos.net/wp-content/uploads/2015/09/Honda-data-tables.pdf)
+
+## Project Files
 - [CMake config for this project](configs/imx6_sabre_lite.cmake)
 - [Main project root dir](projects/hobd_system)
 

@@ -77,7 +77,7 @@ static void thread_fn(void)
 
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
-    /* TODO - reorganize this more */
+    /* TODO - reorganize this more once comm. management is implemented */
 
     /* perform the init sequence */
     hobd_kline_reset_seq(&uart_tx_gpio);
@@ -93,6 +93,7 @@ static void thread_fn(void)
 
     while(1)
     {
+        /* TODO - parser/etc */
         const int data = ps_cdev_getchar(&g_char_dev);
 
         if(data >= 0)

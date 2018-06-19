@@ -2,7 +2,7 @@
  * @file hobd_kline.h
  * @brief Honda OBD K-line Protocol.
  *
- * @todo hobd protocol notes.
+ * @todo hobd protocol notes, how it relates to ISO 9141-2, etc.
  *
  * Data rate: 10,400 bps
  *
@@ -122,4 +122,4 @@ typedef struct
     uint8_t engine_on;
 } hobd_table_d1_s;
 
-#endif  /* HOBD_KLINE_H */
+#endif /* HOBD_KLINE_H */
