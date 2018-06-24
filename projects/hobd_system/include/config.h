@@ -27,7 +27,7 @@
 #define SYSMOD_STACK_SIZE (512)
 #define SYSMOD_EP_BADGE (0x20)
 
-#define HOBDMOD_THREAD_NAME "hobd"
+#define HOBDMOD_THREAD_NAME "hobd-comm"
 #define HOBDMOD_THREAD_AFFINITY (0)
 #define HOBDMOD_STACK_SIZE (512)
 #define HOBDMOD_EP_BADGE (0x21)

@@ -16,6 +16,7 @@
 #include <platsupport/chardev.h>
 #include <platsupport/serial.h>
 #include <platsupport/delay.h>
+#include <sel4utils/sel4_zf_logif.h>
 
 #include "config.h"
 #include "init_env.h"
@@ -23,6 +24,7 @@
 #include "system_module.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
+#include "hobd_msg.h"
 #include "hobd_module.h"
 
 /* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
@@ -33,15 +35,30 @@
 #define UART_TX_PORT (GPIO_BANK1)
 #define UART_TX_PIN (1)
 
-#define HOBD_RX_BUFFER_SIZE (512)
+#define MSG_RX_BUFFER_SIZE (512)
+#define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
 static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
 static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
-static hobd_parser_s hobd_parser;
-static uint8_t hobd_rx_buffer[HOBD_RX_BUFFER_SIZE];
+static hobd_parser_s g_msg_parser;
+static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
+static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
+
+static void send_msg(
+        const hobd_msg_s * const msg)
+{
+    uint16_t idx;
+
+    for(idx = 0; idx < msg->header.size; idx += 1)
+    {
+        ps_cdev_putchar(
+                &g_char_dev,
+                ((uint8_t*) msg)[idx]);
+    }
+}
 
 static void hobd_kline_init_seq(
         gpio_t * const gpio)
@@ -59,11 +76,36 @@ static void hobd_kline_init_seq(
     ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO\n");
 
     ps_mdelay(120);
-
-    /* TODO - send msg */
 }
 
-static void thread_fn(void)
+static void send_ecu_diag_messages(void)
+{
+    hobd_msg_s * const msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
+
+    /* create a wake up message */
+    (void) hobd_msg_no_data(
+            HOBD_MSG_TYPE_WAKE_UP,
+            HOBD_MSG_SUBTYPE_WAKE_UP,
+            &g_msg_tx_buffer[0],
+            (uint32_t) sizeof(g_msg_tx_buffer));
+
+    send_msg(msg);
+
+    ps_mdelay(1);
+
+    /* create a diagnostic init message */
+    msg->data[0] = HOBD_INIT_DATA;
+    (void) hobd_msg(
+            HOBD_MSG_TYPE_QUERY,
+            HOBD_MSG_SUBTYPE_INIT,
+            1,
+            &g_msg_tx_buffer[0],
+            (uint32_t) sizeof(g_msg_tx_buffer));
+
+    send_msg(msg);
+}
+
+static void obd_comm_thread_fn(void)
 {
     int err;
     gpio_t uart_tx_gpio;
@@ -73,9 +115,9 @@ static void thread_fn(void)
 
     /* initialize the HOBD parser */
     hobd_parser_init(
-            &hobd_rx_buffer[0],
-            sizeof(hobd_rx_buffer),
-            &hobd_parser);
+            &g_msg_rx_buffer[0],
+            sizeof(g_msg_rx_buffer),
+            &g_msg_parser);
 
     /* TODO - disable char dev ? */
 
@@ -89,8 +131,6 @@ static void thread_fn(void)
 
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
-    /* TODO - reorganize this more once comm. management is implemented */
-
     /* perform the init sequence */
     hobd_kline_init_seq(&uart_tx_gpio);
 
@@ -103,9 +143,13 @@ static void thread_fn(void)
             1);
     ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
 
+    /* establish a diagnostics connection with the ECU */
+    send_ecu_diag_messages();
+
+    /* TODO - reorganize this more once comm. management is implemented */
+    /* TODO - better parser, handle bad data/comms/etc */
     while(1)
     {
-        /* TODO - better parser, handle bad data/etc */
         const int data = ps_cdev_getchar(&g_char_dev);
 
         if(data >= 0)
@@ -114,12 +158,12 @@ static void thread_fn(void)
 
             const uint8_t status = hobd_parser_parse_byte(
                     (uint8_t) data,
-                    &hobd_parser);
+                    &g_msg_parser);
 
             if(status == 0)
             {
                 const hobd_msg_header_s * const msg =
-                        (hobd_msg_header_s*) &hobd_rx_buffer[0];
+                        (hobd_msg_header_s*) &g_msg_rx_buffer[0];
 
                 ZF_LOGD("got msg - type: 0x%X", (unsigned int) msg->type);
             }
@@ -178,7 +222,7 @@ void hobd_module_init(
             HOBDMOD_EP_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
-            &thread_fn,
+            &obd_comm_thread_fn,
             env,
             &g_thread);
 

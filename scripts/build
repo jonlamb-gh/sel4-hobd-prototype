@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
-# expected to be ran from a build dir
-# mkdir build/
-# cd build/
-# ../scripts/build
-
 set -e
 
-# git submodule update --init
+mkdir -p build/
 
-cmake -C../configs/imx6_sabre_lite.cmake -DCROSS_COMPILER_PREFIX=arm-linux-gnueabihf- -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake -G Ninja ..
+cd build/
+
+cmake \
+    -C../configs/imx6_sabre_lite.cmake \
+    -DCROSS_COMPILER_PREFIX=arm-linux-gnueabihf- \
+    -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake \
+    -G Ninja ..
 
 cmake ..
 
