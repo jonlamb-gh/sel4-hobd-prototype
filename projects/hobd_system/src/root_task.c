@@ -23,10 +23,10 @@
 #include <sel4debug/debug.h>
 #include <platsupport/io.h>
 
+#include "config.h"
+#include "init_env.h"
 #include "platform.h"
 #include "root_task.h"
-
-#define THREAD_NAME "init"
 
 void root_task_init(
         const uint32_t virt_pool_size,
@@ -36,16 +36,13 @@ void root_task_init(
 {
     int err;
 
-    /* prefix the logger with task name */
-    zf_log_set_tag_prefix(THREAD_NAME);
-
     /* get boot info */
     env->boot_info = platsupport_get_bootinfo();
     ZF_LOGF_IF(env->boot_info == NULL, "Failed to get bootinfo\n");
 
     /* name this thread */
 #ifdef CONFIG_DEBUG_BUILD
-    seL4_DebugNameThread(seL4_CapInitThreadTCB, THREAD_NAME);
+    seL4_DebugNameThread(seL4_CapInitThreadTCB, ROOT_THREAD_NAME);
 #endif
 
     /* init simple */

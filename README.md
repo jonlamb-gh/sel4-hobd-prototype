@@ -1,14 +1,26 @@
 # sel4-hobd-prototype
-Prototype HOBD system running on seL4
+
+Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
+
+See the `devel` branch for the most recent developments.
 
 ## TODO
 
 - Add cmake configs for simulation features
 - Remove hard-coded debug configs
+- Add MUX support for the `UART1_TX_DATA` GPIO
 
 ## Links
 
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
+- [HW user manual](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/SABRE_Lite_Hardware_Manual_rev11.pdf)
+- [HW components](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/sabre_lite-revD.pdf)
+- [GPIO mapping guide](https://www.kosagi.com/w/index.php?title=Definitive_GPIO_guide)
+- [Honda OBD Data tables](http://projects.gonzos.net/wp-content/uploads/2015/09/Honda-data-tables.pdf)
+
+## Project Files
+- [CMake config for this project](configs/imx6_sabre_lite.cmake)
+- [Main project root dir](projects/hobd_system)
 
 ## Building
 
@@ -32,6 +44,47 @@ simulating (note that it must be >= `KernelMaxNumNodes`):
 
 ```base
 -smp cores=4
+```
+
+Affinity for the threads used in this project are in [config.h](projects/hobd_system/include/config.h).
+
+## GPIO
+
+```bash
+CSI0_DAT10 | ALT3 | UART1_TX_DATA
+           | ALT5 | GPIO5_IO28
+CSI0_DAT11 | ALT3 | UART1_RX_DATA
+           | ALT5 | GPIO5_IO29
+
+# Sabre Lite uses these on the connector for UART1
+SD3_DAT7 | ALT1 | UART1_TX_DATA
+         | ALT5 | GPIO6_IO17
+SD3_DAT6 | ALT1 | UART1_RX_DATA
+         | ALT5 | GPIO6_IO18
+```
+
+## QEMU Serial Port
+
+In the generated `simulate` script, replace the first serial config:
+
+```bash
+-serial null
+```
+
+With (for example):
+
+```bash
+-serial telnet:localhost:1235,server
+```
+
+Now on the host machine:
+
+```bash
+# connect to serial port via telnet, data will be forwarded to IMX_UART1
+telnet 127.0.0.1 1235
+
+# or bash escapes for binary hex data
+echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 ```
 
 ## Output
@@ -77,22 +130,37 @@ init debug_print_bootinfo@bootinfo.c:44 0x101ac000 | 14 | 0
 2 untypeds of size 27
 ------------------------------
 
-init platform_init@platform.c:76 Platform is initialized
-init root_task_init@root_task.c:108 Created global fault ep 0x277
-init root_task_init@root_task.c:110 Root task is initialized
-init thread_create@thread.c:69 Minting fault ep 0x2B0 for thread 'hobd-module'
-init thread_create@thread.c:124 Created thread 'hobd-module' - stack size 4096 bytes
-init hobd_module_init@hobd_module.c:110 hobd-module is initialized
-init main@main.c:63 Dumping scheduler
+platform_init@platform.c:89 Platform is initialized
+root_task_init@root_task.c:105 Created global fault ep 0x27B
+root_task_init@root_task.c:107 Root task is initialized
+thread_create@thread.c:69 Minting fault ep 0x2B4 for thread 'hobd'
+thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
+hobd_module_init@hobd_module.c:122 hobd is initialized
+thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'sys'
+thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
+system_module_init@system_module.c:86 sys is initialized
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
-hobd-module                                     restart         0x103e8 255                     0
+sys                                             restart         0x11f30 255                     0
+hobd                                            restart         0x103e8 255                     0
 idle_thread                                     idle            (nil)   0                       0
-init                                            running         0x14770 255                     0
+init                                            running         0x16214 255                     0
 
-hobd-module thread_fn@hobd_module.c:42 thread is running, about to intentionally fault
-hobd-module main@main.c:78 Received fault on ep 0x277 - badge 0x61
-Pagefault from [fault-handler]: write fault at PC: 0x10450 vaddr: 0xdeadbeef, FSR 0x805
+thread_fn@system_module.c:44 System ready to start
+signal_ready_to_start@system_module.c:31 System starting
+thread_fn@hobd_module.c:37 thread is running, about to intentionally fault
+main@main.c:82 Received fault on ep 0x27B - badge 0x21
+Pagefault from [fault-handler]: write fault at PC: 0x10454 vaddr: 0xdeadbeef, FSR 0x805
+debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
+
+Dumping all tcbs!
+Name                                            State           IP                       Prio    Core
+--------------------------------------------------------------------------------------
+sys                                             running         0x10c10 255                     0
+hobd                                            blocked on reply        0x10454 255             0
+idle_thread                                     idle            (nil)   0                       0
+init                                            running         0x16214 255                     0
 ```

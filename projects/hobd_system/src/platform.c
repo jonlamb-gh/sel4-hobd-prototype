@@ -17,8 +17,11 @@
 #include <sel4debug/debug.h>
 #include <platsupport/io.h>
 #include <platsupport/clock.h>
+#include <platsupport/delay.h>
 #include <utils/frequency.h>
 
+#include "config.h"
+#include "init_env.h"
 #include "platform.h"
 
 #define IMX6_MAX_FREQ (996 * MHZ)
@@ -81,6 +84,9 @@ void platform_init(
 
     /* initialize clock, set max frequency */
     init_clock(env);
+
+    /* inform libplatsupport about our CPU frequency */
+    ps_cpufreq_hint(IMX6_MAX_FREQ);
 
     ZF_LOGD("Platform is initialized");
 }

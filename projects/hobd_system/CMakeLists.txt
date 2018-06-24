@@ -17,7 +17,9 @@ ApplyData61ElfLoaderSettings()
 
 add_executable(
     hobd-system
+    modules/hobd/src/hobd_parser.c
     modules/hobd/src/hobd_module.c
+    modules/system/src/system_module.c
     src/platform.c
     src/root_task.c
     src/thread.c
@@ -53,6 +55,7 @@ target_include_directories(
     hobd-system
     PRIVATE
     modules/hobd/include
+    modules/system/include
     include)
 
 target_link_libraries(
@@ -66,6 +69,7 @@ target_link_libraries(
     sel4platsupport
     sel4muslcsys
     sel4simple-default
+    sel4sync
     sel4debug
     platsupport
     utils

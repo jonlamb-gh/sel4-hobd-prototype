@@ -15,43 +15,163 @@
 #include <platsupport/gpio.h>
 #include <platsupport/chardev.h>
 #include <platsupport/serial.h>
+#include <platsupport/delay.h>
+#include <sel4utils/sel4_zf_logif.h>
 
+#include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "system_module.h"
+#include "hobd_kline.h"
+#include "hobd_parser.h"
+#include "hobd_msg.h"
 #include "hobd_module.h"
 
-/* TODO - move to a config.h ? */
-#define THREAD_NAME "hobd-module"
+/* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
+ * doesn't seem to support all the GPIOs */
+/* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 */
+//#define UART_TX_PORT (GPIO_BANK6)
+//#define UART_TX_PIN (17)
+#define UART_TX_PORT (GPIO_BANK1)
+#define UART_TX_PIN (1)
 
-/* arbitrary (but unique) number for a badge */
-#define EP_BADGE (0x61)
-
-/* size of the thread's stack in words */
-#define THREAD_STACK_SIZE (512)
+#define MSG_RX_BUFFER_SIZE (512)
+#define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
 static ps_chardevice_t g_char_dev;
 static gpio_sys_t g_gpio_sys;
 static thread_s g_thread;
-static uint64_t g_thread_stack[THREAD_STACK_SIZE];
+static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 
-static void thread_fn(void)
+static hobd_parser_s g_msg_parser;
+static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
+static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
+
+static void send_msg(
+        const hobd_msg_s * const msg)
 {
-    /* prefix the logger with task name */
-    zf_log_set_tag_prefix(THREAD_NAME);
+    uint16_t idx;
 
-    /* TODO - delay for a short period */
-    unsigned long i;
-    for(i = 0; i < 0xFFFFF; i++)
+    for(idx = 0; idx < msg->header.size; idx += 1)
     {
-        seL4_Yield();
+        ps_cdev_putchar(
+                &g_char_dev,
+                ((uint8_t*) msg)[idx]);
+    }
+}
+
+static void hobd_kline_init_seq(
+        gpio_t * const gpio)
+{
+    int err;
+
+    /* pull k-line low for 70 ms */
+    err = gpio_clr(gpio);
+    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO\n");
+
+    ps_mdelay(70);
+
+    /* return to high, wait 120 ms */
+    err = gpio_set(gpio);
+    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO\n");
+
+    ps_mdelay(120);
+}
+
+static void send_ecu_diag_messages(void)
+{
+    hobd_msg_s * const msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
+
+    /* create a wake up message */
+    (void) hobd_msg_no_data(
+            HOBD_MSG_TYPE_WAKE_UP,
+            HOBD_MSG_SUBTYPE_WAKE_UP,
+            &g_msg_tx_buffer[0],
+            (uint32_t) sizeof(g_msg_tx_buffer));
+
+    send_msg(msg);
+
+    ps_mdelay(1);
+
+    /* create a diagnostic init message */
+    msg->data[0] = HOBD_INIT_DATA;
+    (void) hobd_msg(
+            HOBD_MSG_TYPE_QUERY,
+            HOBD_MSG_SUBTYPE_INIT,
+            1,
+            &g_msg_tx_buffer[0],
+            (uint32_t) sizeof(g_msg_tx_buffer));
+
+    send_msg(msg);
+}
+
+static void obd_comm_thread_fn(void)
+{
+    int err;
+    gpio_t uart_tx_gpio;
+
+    /* wait for system ready */
+    system_module_wait_for_start();
+
+    /* initialize the HOBD parser */
+    hobd_parser_init(
+            &g_msg_rx_buffer[0],
+            sizeof(g_msg_rx_buffer),
+            &g_msg_parser);
+
+    /* TODO - disable char dev ? */
+
+    /* initialize UART TX GPIO */
+    err = gpio_new(
+            &g_gpio_sys,
+            GPIOID(UART_TX_PORT, UART_TX_PIN),
+            GPIO_DIR_OUT,
+            &uart_tx_gpio);
+    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
+
+    ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
+
+    /* perform the init sequence */
+    hobd_kline_init_seq(&uart_tx_gpio);
+
+    /* reconfigure the serial port */
+    err = serial_configure(
+            &g_char_dev,
+            115200,
+            8,
+            PARITY_NONE,
+            1);
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
+
+    /* establish a diagnostics connection with the ECU */
+    send_ecu_diag_messages();
+
+    /* TODO - reorganize this more once comm. management is implemented */
+    /* TODO - better parser, handle bad data/comms/etc */
+    while(1)
+    {
+        const int data = ps_cdev_getchar(&g_char_dev);
+
+        if(data >= 0)
+        {
+            ZF_LOGD("got data: 0x%02X", (unsigned int) data);
+
+            const uint8_t status = hobd_parser_parse_byte(
+                    (uint8_t) data,
+                    &g_msg_parser);
+
+            if(status == 0)
+            {
+                const hobd_msg_header_s * const msg =
+                        (hobd_msg_header_s*) &g_msg_rx_buffer[0];
+
+                ZF_LOGD("got msg - type: 0x%X", (unsigned int) msg->type);
+            }
+        }
     }
 
-    ZF_LOGW("thread is running, about to intentionally fault");
-
-    /* fault */
-    *((char*)0xDEADBEEF) = 0;
-
-    ZF_LOGI("thread resumed");
+    /* should not get here, intentional halt */
+    seL4_DebugHalt();
 }
 
 static void init_gpio(
@@ -61,34 +181,23 @@ static void init_gpio(
 
     (void) memset(&g_gpio_sys, 0, sizeof(g_gpio_sys));
 
-    /* initialize the MUX subsytem */
+    /* initialize the MUX subsystem */
     err = mux_sys_init(
             &env->io_ops,
             NULL,
             &env->io_ops.mux_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize MUX subsystem\n");
 
-    /* initialize the GPIO subsytem */
+    /* initialize the GPIO subsystem */
     err = gpio_sys_init(
             &env->io_ops,
             &g_gpio_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem\n");
-
-    /* TODO - this is just a random port/pin combo */
-    gpio_t gpio;
-    err = gpio_new(
-            &g_gpio_sys,
-            GPIOID(GPIO_BANK1, 1),
-            GPIO_DIR_OUT,
-            &gpio);
-    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
 }
 
 static void init_uart(
         init_env_s * const env)
 {
-    int err;
-
     (void) memset(&g_char_dev, 0, sizeof(g_char_dev));
 
     /* initialize character device - PS_SERIAL0 = IMX_UART1 */
@@ -97,15 +206,6 @@ static void init_uart(
             &env->io_ops,
             &g_char_dev);
     ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device\n");
-
-    /* line configuration of serial port */
-    err = serial_configure(
-            &g_char_dev,
-            115200,
-            8,
-            PARITY_NONE,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
 }
 
 void hobd_module_init(
@@ -116,21 +216,21 @@ void hobd_module_init(
     init_gpio(env);
     init_uart(env);
 
-    /* create a new thread */
+    /* create a worker thread */
     thread_create(
-            THREAD_NAME,
-            EP_BADGE,
+            HOBDMOD_THREAD_NAME,
+            HOBDMOD_EP_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
-            &thread_fn,
+            &obd_comm_thread_fn,
             env,
             &g_thread);
 
     /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
-    thread_set_affinity(0, &g_thread);
+    thread_set_affinity(HOBDMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", THREAD_NAME);
+    ZF_LOGD("%s is initialized", HOBDMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);

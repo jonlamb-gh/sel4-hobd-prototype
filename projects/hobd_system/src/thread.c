@@ -121,7 +121,7 @@ void thread_create(
     err = seL4_TCB_WriteRegisters(thread->tcb_object.cptr, 0, 0, regs_size, &regs);
     ZF_LOGF_IF(err != 0, "Failed to write new thread's register set\n");
 
-    ZF_LOGD("Created thread '%s' - stack size %u bytes", name, (size_t) stack_size);
+    ZF_LOGD("Created thread '%s' - stack size %" PRIu32 " bytes", name, stack_size);
 }
 
 void thread_set_priority(
