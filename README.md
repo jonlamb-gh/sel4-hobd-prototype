@@ -20,7 +20,8 @@ See the `devel` branch for the most recent developments.
 
 ## Project Files
 - [CMake config for this project](configs/imx6_sabre_lite.cmake)
-- [Main project root dir](projects/hobd_system)
+- [Main project root directory](projects/hobd_system)
+- [ECU data generator tool](testing_tools/fake_hobd_ecu_data/README.md)
 
 ## Building
 
@@ -71,6 +72,9 @@ With (for example):
 
 ```bash
 -serial telnet:localhost:1235,server
+
+# another example
+-serial tcp:localhost:1235,server,nowait,nodelay
 ```
 
 Now on the host machine:
