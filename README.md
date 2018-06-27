@@ -25,11 +25,7 @@ See the `devel` branch for the most recent developments.
 ## Building
 
 ```bash
-mkdir build/
-
-cd build/
-
-../scripts/build
+./scripts/build
 ```
 
 ## SMP / Multicore

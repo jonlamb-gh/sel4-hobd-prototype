@@ -75,6 +75,11 @@ void platform_init(
             &env->io_ops.io_mapper);
     ZF_LOGF_IF(err != 0, "Failed to create new IO mapper\n");
 
+    /* create new malloc ops */
+    err = sel4platsupport_new_malloc_ops(
+            &env->io_ops.malloc_ops);
+    ZF_LOGF_IF(err != 0, "Failed to create new malloc ops\n");
+
     /* create a dma manager, allocates at page granularity */
     err = sel4utils_new_page_dma_alloc(
             &env->vka,
