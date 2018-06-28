@@ -4,6 +4,8 @@ project(fake-hobd-ecu-data VERSION 0.1 LANGUAGES C)
 
 add_executable(
     fake-hobd-ecu-data
+    src/hobd_parser.c
+    src/ecu.c
     src/main.c)
 
 set_property(
@@ -28,10 +30,11 @@ target_compile_options(
     -Wno-unused-result
     -Werror)
 
-#target_include_directories(
-#    fake-hobd-ecu-data
-#    PRIVATE
-#    include)
+target_include_directories(
+    fake-hobd-ecu-data
+    PRIVATE
+    ../../projects/hobd_system/modules/hobd/include
+    include)
 
 target_link_libraries(
     fake-hobd-ecu-data

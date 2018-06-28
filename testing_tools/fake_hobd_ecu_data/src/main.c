@@ -18,18 +18,34 @@
 #include <assert.h>
 #include <popt.h>
 
+#include "ecu.h"
+
 #define TCP_PORT (1235)
 #define TCP_ADDR "127.0.0.1"
 
-int main(int argc, char **argv)
+static volatile sig_atomic_t g_exit_signaled;
+
+static void sig_handler(
+        int sig)
+{
+    if(sig == SIGINT)
+    {
+        g_exit_signaled = 1;
+    }
+}
+
+int main(
+        int argc,
+        char **argv)
 {
     int err = 0;
     struct sockaddr_in server_address;
+    struct sigaction sigact;
 
     memset(&server_address, 0, sizeof(server_address));
-
 	server_address.sin_family = AF_INET;
     server_address.sin_port = htons(TCP_PORT);
+
     err = inet_pton(AF_INET, TCP_ADDR, &server_address.sin_addr);
     assert(err == 1);
 
@@ -46,8 +62,31 @@ int main(int argc, char **argv)
         assert(err == 0);
     }
 
-    // TODO
-    // send(socket_fs, data, size, flags);
+    (void) memset(&sigact, 0, sizeof(sigact));
+    g_exit_signaled = 0;
+    sigact.sa_flags = SA_RESTART;
+    sigact.sa_handler = sig_handler;
+
+    err = sigaction(SIGINT, &sigact, 0);
+    assert(err == 0);
+
+    ecu_s * const ecu = ecu_new(socket_fd);
+    assert(ecu != NULL);
+
+    while(g_exit_signaled == 0)
+    {
+        err = ecu_update(ecu);
+
+        if(err != 0)
+        {
+            g_exit_signaled = 1;
+        }
+    }
+
+    if(ecu != NULL)
+    {
+        free(ecu);
+    }
 
     if(socket_fd >= 0)
     {
