@@ -159,7 +159,7 @@ static void handle_rx_message(
 {
     /* TODO - behavior for invalid data/etc */
     hobd_msg_s * const tx_msg =
-            (hobd_msg_s*) ecu->tx_buffer;
+            (hobd_msg_s*) &ecu->tx_buffer[0];
 
     /* handle OBD init message response */
     if(
@@ -170,8 +170,10 @@ static void handle_rx_message(
         tx_msg->header.size = HOBD_MSG_HEADERCS_SIZE;
         tx_msg->header.subtype = HOBD_MSG_SUBTYPE_INIT;
 
+        /* TODO - check init data HOBD_INIT_DATA */
+
         tx_msg->data[0] = hobd_parser_checksum(
-                &ecu->tx_buffer[0],
+                (uint8_t*) tx_msg,
                 tx_msg->header.size - 1);
 
         /* TESTING */
@@ -219,8 +221,8 @@ static void handle_rx_message(
                     query->count);
         }
 
-        tx_msg->data[tx_msg->header.size] = hobd_parser_checksum(
-                (uint8_t*) msg,
+        tx_msg->data[tx_msg->header.size - HOBD_MSG_HEADER_SIZE - 1] = hobd_parser_checksum(
+                (uint8_t*) tx_msg,
                 tx_msg->header.size - 1);
 
         /* TESTING */
@@ -307,6 +309,16 @@ ecu_s *ecu_new(
             &ecu->rx_buffer[0],
             (uint16_t) sizeof(ecu->rx_buffer),
             &ecu->rx_parser);
+
+    (void) memset(
+            &ecu->table_10_page[0],
+            0xAA,
+            sizeof(ecu->table_10_page));
+
+    (void) memset(
+            &ecu->table_D1_page[0],
+            0xBB,
+            sizeof(ecu->table_D1_page));
 
     reset_state(ecu);
 

@@ -67,33 +67,33 @@ typedef struct
     uint8_t type;
     uint8_t size; // header + data + checksum
     uint8_t subtype;
-} hobd_msg_header_s;
+} __attribute__((__packed__)) hobd_msg_header_s;
 
 typedef struct
 {
     hobd_msg_header_s header;
     uint8_t data[0];
     // checksum
-} hobd_msg_s;
+} __attribute__((__packed__)) hobd_msg_s;
 
 typedef struct
 {
     uint8_t table;
     uint8_t offset; // address
     uint8_t count; // == size in bytes, 1-byte table registers?
-} hobd_data_table_query_s;
+} __attribute__((__packed__)) hobd_data_table_query_s;
 
 typedef struct
 {
     uint8_t table;
     uint8_t offset;
     uint8_t data[0];
-} hobd_data_table_response_s;
+} __attribute__((__packed__)) hobd_data_table_response_s;
 
 typedef struct
 {
     uint8_t data;
-} hobd_data_init_s;
+} __attribute__((__packed__)) hobd_data_init_s;
 
 typedef struct
 {
@@ -111,7 +111,7 @@ typedef struct
     uint8_t battery_volt;
     uint8_t wheel_speed;
     uint16_t fuel_injectors;
-} hobd_table_10_s;
+} __attribute__((__packed__)) hobd_table_10_s;
 
 typedef struct
 {
@@ -120,6 +120,6 @@ typedef struct
     uint8_t reserved_1;
     uint8_t reserved_2;
     uint8_t engine_on;
-} hobd_table_d1_s;
+} __attribute__((__packed__)) hobd_table_d1_s;
 
 #endif /* HOBD_KLINE_H */
