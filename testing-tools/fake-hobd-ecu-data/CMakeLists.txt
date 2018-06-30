@@ -33,7 +33,7 @@ target_compile_options(
 target_include_directories(
     fake-hobd-ecu-data
     PRIVATE
-    ../../projects/hobd_system/modules/hobd/include
+    ../../projects/hobd-system/modules/hobd/include
     include)
 
 target_link_libraries(
