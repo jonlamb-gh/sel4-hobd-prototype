@@ -65,7 +65,7 @@
 typedef struct
 {
     uint8_t type;
-    uint8_t size;
+    uint8_t size; // header + data + checksum
     uint8_t subtype;
 } hobd_msg_header_s;
 
@@ -79,8 +79,8 @@ typedef struct
 typedef struct
 {
     uint8_t table;
-    uint8_t offset;
-    uint8_t count;
+    uint8_t offset; // address
+    uint8_t count; // == size in bytes, 1-byte table registers?
 } hobd_data_table_query_s;
 
 typedef struct

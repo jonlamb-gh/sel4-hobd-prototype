@@ -26,6 +26,7 @@
 #include "hobd_kline.h"
 #include "hobd_parser.h"
 #include "hobd_msg.h"
+#include "comm.h"
 #include "hobd_module.h"
 
 /* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
@@ -39,9 +40,7 @@
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
-static ps_chardevice_t g_char_dev;
-static gpio_sys_t g_gpio_sys;
-static ltimer_t g_timer;
+static comm_s g_comm;
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
@@ -49,44 +48,6 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
-
-static void get_timestamp_ns(
-        uint64_t * const time)
-{
-    const int err = ltimer_get_time(&g_timer, time);
-    ZF_LOGF_IF(err != 0, "Failed to get time\n");
-}
-
-static void send_msg(
-        const hobd_msg_s * const msg)
-{
-    uint16_t idx;
-
-    for(idx = 0; idx < msg->header.size; idx += 1)
-    {
-        ps_cdev_putchar(
-                &g_char_dev,
-                ((uint8_t*) msg)[idx]);
-    }
-}
-
-static void hobd_kline_init_seq(
-        gpio_t * const gpio)
-{
-    int err;
-
-    /* pull k-line low for 70 ms */
-    err = gpio_clr(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO\n");
-
-    ps_mdelay(70);
-
-    /* return to high, wait 120 ms */
-    err = gpio_set(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO\n");
-
-    ps_mdelay(120);
-}
 
 static void send_ecu_diag_messages(void)
 {
@@ -99,7 +60,7 @@ static void send_ecu_diag_messages(void)
             &g_msg_tx_buffer[0],
             (uint32_t) sizeof(g_msg_tx_buffer));
 
-    send_msg(msg);
+    comm_send_msg(msg, &g_comm);
 
     ps_mdelay(1);
 
@@ -112,37 +73,7 @@ static void send_ecu_diag_messages(void)
             &g_msg_tx_buffer[0],
             (uint32_t) sizeof(g_msg_tx_buffer));
 
-    send_msg(msg);
-}
-
-/* TODO - timeout ? */
-static void wait_for_ecu_message(void)
-{
-    int msg_received = 0;
-
-    while(msg_received == 0)
-    {
-        const int data = ps_cdev_getchar(&g_char_dev);
-
-        if(data >= 0)
-        {
-            ZF_LOGD("got data: 0x%02X", (unsigned int) data);
-
-            const uint8_t status = hobd_parser_parse_byte(
-                    (uint8_t) data,
-                    &g_msg_parser);
-
-            if(status == 0)
-            {
-                const hobd_msg_header_s * const msg =
-                        (hobd_msg_header_s*) &g_msg_rx_buffer[0];
-
-                msg_received = 1;
-
-                ZF_LOGD("got msg - type: 0x%X", (unsigned int) msg->type);
-            }
-        }
-    }
+    comm_send_msg(msg, &g_comm);
 }
 
 static void obd_comm_thread_fn(void)
@@ -163,7 +94,7 @@ static void obd_comm_thread_fn(void)
 
     /* initialize UART TX GPIO */
     err = gpio_new(
-            &g_gpio_sys,
+            &g_comm.gpio_sys,
             GPIOID(UART_TX_PORT, UART_TX_PIN),
             GPIO_DIR_OUT,
             &uart_tx_gpio);
@@ -172,11 +103,11 @@ static void obd_comm_thread_fn(void)
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
     /* perform the init sequence */
-    hobd_kline_init_seq(&uart_tx_gpio);
+    comm_gpio_init_seq(&uart_tx_gpio, &g_comm);
 
     /* reconfigure the serial port */
     err = serial_configure(
-            &g_char_dev,
+            &g_comm.char_dev,
             115200,
             8,
             PARITY_NONE,
@@ -190,11 +121,15 @@ static void obd_comm_thread_fn(void)
     /* TODO - better parser, handle bad data/comms/etc */
     while(1)
     {
-        wait_for_ecu_message();
+        const hobd_msg_s * const msg = comm_recv_msg(
+                &g_msg_parser,
+                &g_comm);
+
+        (void) msg;
 
         /* example */
         uint64_t time;
-        get_timestamp_ns(&time);
+        comm_timestamp(&time, &g_comm);
 
         ZF_LOGD("time is %llu ns", time);
     }
@@ -209,13 +144,13 @@ static void init_timer(
     int err;
     uint64_t time;
 
-    err = ltimer_default_init(&g_timer, env->io_ops);
+    err = ltimer_default_init(&g_comm.timer, env->io_ops);
     ZF_LOGF_IF(err != 0, "Failed to initialize timer\n");
 
-    err = ltimer_reset(&g_timer);
+    err = ltimer_reset(&g_comm.timer);
     ZF_LOGF_IF(err != 0, "Failed to reset timer\n");
 
-    err = ltimer_get_time(&g_timer, &time);
+    err = ltimer_get_time(&g_comm.timer, &time);
     ZF_LOGF_IF(err != 0, "Failed to get time\n");
 
     ZF_LOGD("Created timer - current time is %llu ns", time);
@@ -236,7 +171,7 @@ static void init_gpio(
     /* initialize the GPIO subsystem */
     err = gpio_sys_init(
             &env->io_ops,
-            &g_gpio_sys);
+            &g_comm.gpio_sys);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem\n");
 }
 
@@ -247,7 +182,7 @@ static void init_uart(
     const ps_chardevice_t * const char_dev = ps_cdev_init(
             PS_SERIAL0,
             &env->io_ops,
-            &g_char_dev);
+            &g_comm.char_dev);
     ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device\n");
 }
 

@@ -183,14 +183,15 @@ static void handle_rx_message(
             || (msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE))
     {
         /* table/subtable query */
+        /* TODO - is the format the same for both types? */
         const hobd_data_table_query_s * const query =
                 (hobd_data_table_query_s*) &msg->data[0];
 
         hobd_data_table_response_s * const resp =
                 (hobd_data_table_response_s*) &tx_msg->data[0];
 
-        /* TODO - support subtable with offsets */
-        assert(msg->header.type != HOBD_MSG_SUBTYPE_TABLE);
+        /* TODO - support full table query */
+        assert(msg->header.type == HOBD_MSG_SUBTYPE_TABLE);
         assert(((int) query->offset + (int) query->count) <= HOBD_TABLE_SIZE_MAX);
 
         /* TODO - check table max size - probably should be < 255 */
@@ -211,7 +212,6 @@ static void handle_rx_message(
             uint8_t * const data_table = get_data_table(query->table, ecu);
             assert(data_table != NULL);
 
-            /* TODO - support subtable with offsets */
             (void) memcpy(
                     &resp->data[0],
                     &data_table[query->offset],
