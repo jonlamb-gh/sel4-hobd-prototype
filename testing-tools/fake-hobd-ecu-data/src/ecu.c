@@ -193,6 +193,8 @@ static void handle_rx_message(
         assert(msg->header.type != HOBD_MSG_SUBTYPE_TABLE);
         assert(((int) query->offset + (int) query->count) <= HOBD_TABLE_SIZE_MAX);
 
+        /* TODO - check table max size - probably should be < 255 */
+
         /* fill response */
         tx_msg->header.type = HOBD_MSG_TYPE_RESPONSE;
         tx_msg->header.size = HOBD_MSG_HEADERCS_SIZE;
@@ -314,8 +316,6 @@ int ecu_update(
         ecu_s * const ecu)
 {
     int err = 0;
-
-    /* https://github.com/jonlamb-gh/hobd-module/blob/devel/simulator/src/ecu.c#L44 */
 
     if(ecu->state == STATE_WAIT4_WAKEUP)
     {
