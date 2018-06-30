@@ -57,8 +57,7 @@ static void send_ecu_diag_messages(void)
     (void) hobd_msg_no_data(
             HOBD_MSG_TYPE_WAKE_UP,
             HOBD_MSG_SUBTYPE_WAKE_UP,
-            &g_msg_tx_buffer[0],
-            (uint32_t) sizeof(g_msg_tx_buffer));
+            &g_msg_tx_buffer[0]);
 
     comm_send_msg(msg, &g_comm);
 
@@ -70,8 +69,7 @@ static void send_ecu_diag_messages(void)
             HOBD_MSG_TYPE_QUERY,
             HOBD_MSG_SUBTYPE_INIT,
             1,
-            &g_msg_tx_buffer[0],
-            (uint32_t) sizeof(g_msg_tx_buffer));
+            &g_msg_tx_buffer[0]);
 
     comm_send_msg(msg, &g_comm);
 }
@@ -117,10 +115,28 @@ static void obd_comm_thread_fn(void)
     /* establish a diagnostics connection with the ECU */
     send_ecu_diag_messages();
 
+    /* TODO */
+    {
+        const hobd_msg_s * const resp_msg = comm_recv_msg(
+                &g_msg_parser,
+                &g_comm);
+
+        (void) resp_msg;
+        uint64_t resp_time;
+        comm_timestamp(&resp_time, &g_comm);
+        ZF_LOGD("response msg time is %llu ns", resp_time);
+    }
+
     /* TODO - reorganize this more once comm. management is implemented */
     /* TODO - better parser, handle bad data/comms/etc */
     while(1)
     {
+        hobd_msg_s * const tx_msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
+
+        comm_fill_msg_subgroub_10_query(tx_msg);
+
+        comm_send_msg(tx_msg, &g_comm);
+
         const hobd_msg_s * const msg = comm_recv_msg(
                 &g_msg_parser,
                 &g_comm);

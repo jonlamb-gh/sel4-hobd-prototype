@@ -208,6 +208,11 @@ uint8_t hobd_parser_parse_byte(
         {
             parser->invalid_count += 1;
             ret = HOBD_ERROR_CHECKSUM;
+            ZF_LOGD(
+                    "bad checksum 0x%02X - expected 0x%02X - invalid_cnt %lu",
+                    (unsigned int) byte,
+                    (unsigned int) (parser->checksum & 0x00FF),
+                    (unsigned long) parser->invalid_count);
         }
 
         parser->state = HOBD_PARSER_STATE_GET_TYPE;

@@ -232,5 +232,5 @@ uint8_t hobd_parser_checksum(
         cs = (0x0100 - cs);
     }
 
-    return (uint8_t) (cs & 0xFF);
+    return (uint8_t) (cs & 0x00FF);
 }

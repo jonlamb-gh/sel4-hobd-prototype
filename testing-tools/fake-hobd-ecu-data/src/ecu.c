@@ -162,25 +162,26 @@ static void handle_rx_message(
             (hobd_msg_s*) ecu->tx_buffer;
 
     /* handle OBD init message response */
-    if(msg->header.type == HOBD_MSG_TYPE_QUERY)
+    if(
+            (msg->header.type == HOBD_MSG_TYPE_QUERY)
+            && (msg->header.subtype == HOBD_MSG_SUBTYPE_INIT))
     {
-        if(msg->header.subtype == HOBD_MSG_SUBTYPE_INIT)
-        {
-            tx_msg->header.type = HOBD_MSG_TYPE_RESPONSE;
-            tx_msg->header.size = HOBD_MSG_HEADERCS_SIZE;
-            tx_msg->header.subtype = HOBD_MSG_SUBTYPE_INIT;
+        tx_msg->header.type = HOBD_MSG_TYPE_RESPONSE;
+        tx_msg->header.size = HOBD_MSG_HEADERCS_SIZE;
+        tx_msg->header.subtype = HOBD_MSG_SUBTYPE_INIT;
 
-            tx_msg->data[0] = hobd_parser_checksum(
-                    &ecu->tx_buffer[0],
-                    tx_msg->header.size - 1);
+        tx_msg->data[0] = hobd_parser_checksum(
+                &ecu->tx_buffer[0],
+                tx_msg->header.size - 1);
 
-            /* TESTING */
-            (void) send_message(tx_msg, ecu);
-        }
+        /* TESTING */
+        (void) send_message(tx_msg, ecu);
     }
     else if(
-            (msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
-            || (msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE))
+            (msg->header.type == HOBD_MSG_TYPE_QUERY)
+            &&
+            ((msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
+            || (msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE)))
     {
         /* table/subtable query */
         /* TODO - is the format the same for both types? */
@@ -191,7 +192,7 @@ static void handle_rx_message(
                 (hobd_data_table_response_s*) &tx_msg->data[0];
 
         /* TODO - support full table query */
-        assert(msg->header.type == HOBD_MSG_SUBTYPE_TABLE);
+        assert(msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP);
         assert(((int) query->offset + (int) query->count) <= HOBD_TABLE_SIZE_MAX);
 
         /* TODO - check table max size - probably should be < 255 */
@@ -219,7 +220,7 @@ static void handle_rx_message(
         }
 
         tx_msg->data[tx_msg->header.size] = hobd_parser_checksum(
-                &ecu->tx_buffer[0],
+                (uint8_t*) msg,
                 tx_msg->header.size - 1);
 
         /* TESTING */

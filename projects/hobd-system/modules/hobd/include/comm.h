@@ -44,4 +44,7 @@ hobd_msg_s *comm_recv_msg(
         hobd_parser_s * const parser,
         comm_s * const comm);
 
+void comm_fill_msg_subgroub_10_query(
+        hobd_msg_s * const msg);
+
 #endif /* COMM_H */

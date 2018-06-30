@@ -20,6 +20,7 @@
 #include "config.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
+#include "hobd_msg.h"
 #include "comm.h"
 
 void comm_timestamp(
@@ -61,6 +62,12 @@ void comm_send_msg(
                 &comm->char_dev,
                 ((uint8_t*) msg)[idx]);
     }
+
+    ZF_LOGD(
+            "tx_msg[%02X:%02X:%02X]",
+            (unsigned int) msg->header.type,
+            (unsigned int) msg->header.size,
+            (unsigned int) msg->header.subtype);
 }
 
 /* TODO - timeouts ? */
@@ -96,4 +103,23 @@ hobd_msg_s *comm_recv_msg(
     }
 
     return msg;
+}
+
+void comm_fill_msg_subgroub_10_query(
+        hobd_msg_s * const msg)
+{
+    hobd_data_table_query_s * const query =
+            (hobd_data_table_query_s*) &msg->data[0];
+
+    /* TODO */
+    query->table = HOBD_TABLE_10;
+    query->offset = 0;
+    query->count = 0x05;
+    //query->count = 0x80;
+
+    (void) hobd_msg(
+            HOBD_MSG_TYPE_QUERY,
+            HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+            (uint8_t) sizeof(query),
+            (uint8_t*) msg);
 }
