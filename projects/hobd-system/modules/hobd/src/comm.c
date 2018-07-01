@@ -83,7 +83,7 @@ hobd_msg_s *comm_recv_msg(
 
         if(data >= 0)
         {
-            ZF_LOGD("got data: 0x%02X", (unsigned int) data);
+            //ZF_LOGD("got data: 0x%02X", (unsigned int) data);
 
             const uint8_t status = hobd_parser_parse_byte(
                     (uint8_t) data,
@@ -114,7 +114,25 @@ void comm_fill_msg_subgroub_10_query(
     /* TODO */
     query->table = HOBD_TABLE_10;
     query->offset = 0;
-    query->count = 0x05;
+    query->count = 0x80;
+
+    (void) hobd_msg(
+            HOBD_MSG_TYPE_QUERY,
+            HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+            (uint8_t) sizeof(query),
+            (uint8_t*) msg);
+}
+
+void comm_fill_msg_subgroub_d1_query(
+        hobd_msg_s * const msg)
+{
+    hobd_data_table_query_s * const query =
+            (hobd_data_table_query_s*) &msg->data[0];
+
+    /* TODO */
+    query->table = HOBD_TABLE_D1;
+    query->offset = 0;
+    query->count = 0x06;
     //query->count = 0x80;
 
     (void) hobd_msg(

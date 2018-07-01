@@ -18,6 +18,9 @@
 #include "hobd_parser.h"
 #include "ecu.h"
 
+/* 1 ms */
+#define POST_SEND_DELAY_US (1000)
+
 typedef enum
 {
     STATE_WAIT4_WAKEUP = 0,
@@ -123,6 +126,10 @@ static int send_message(
     {
         bytes_written = (int) msg->header.size;
     }
+
+#if POST_SEND_DELAY_US > 0
+    (void) usleep(POST_SEND_DELAY_US);
+#endif
 
     return bytes_written;
 }

@@ -16,11 +16,21 @@
 #include "hobd_parser.h"
 #include "hobd_kline.h"
 
+typedef enum
+{
+    COMM_STATE_GPIO_INIT = 0,
+    COMM_STATE_SEND_ECU_INIT,
+    COMM_STATE_SEND_REQ0,
+    COMM_STATE_SEND_REQ1
+} comm_state_kind;
+
 typedef struct
 {
+    comm_state_kind state;
     ps_chardevice_t char_dev;
-    gpio_sys_t gpio_sys;
     ltimer_t timer;
+    gpio_sys_t gpio_sys;
+    gpio_t gpio_uart_tx;
 } comm_s;
 
 /* TODO - comm init/reset/etc */
@@ -45,6 +55,9 @@ hobd_msg_s *comm_recv_msg(
         comm_s * const comm);
 
 void comm_fill_msg_subgroub_10_query(
+        hobd_msg_s * const msg);
+
+void comm_fill_msg_subgroub_d1_query(
         hobd_msg_s * const msg);
 
 #endif /* COMM_H */

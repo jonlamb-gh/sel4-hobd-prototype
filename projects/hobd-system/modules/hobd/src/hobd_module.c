@@ -40,6 +40,8 @@
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
+#define HOBD_KLINE_BAUD (10400UL)
+
 static comm_s g_comm;
 
 static thread_s g_thread;
@@ -49,8 +51,27 @@ static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
 
+static void ecu_init_seq(void)
+{
+    ZF_LOGD("Performing ECU GPIO initialization sequence");
+
+    /* perform the init sequence */
+    comm_gpio_init_seq(&g_comm.gpio_uart_tx, &g_comm);
+
+    /* reconfigure the serial port */
+    const int err = serial_configure(
+            &g_comm.char_dev,
+            HOBD_KLINE_BAUD,
+            8,
+            PARITY_NONE,
+            1);
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
+}
+
 static void send_ecu_diag_messages(void)
 {
+    ZF_LOGD("Sending ECU diagnostic messages");
+
     hobd_msg_s * const msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
 
     /* create a wake up message */
@@ -74,10 +95,87 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 }
 
+/* TODO - timeout */
+static void wait_for_resp(
+        const uint8_t subtype)
+{
+    uint8_t resp_found = 0;
+
+    while(resp_found == 0)
+    {
+        const hobd_msg_s * const msg = comm_recv_msg(
+                &g_msg_parser,
+                &g_comm);
+
+        if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+        {
+            if(msg->header.subtype == subtype)
+            {
+                resp_found = 1;
+            }
+        }
+    }
+
+    /* TODO - testing */
+    uint64_t resp_time;
+    comm_timestamp(&resp_time, &g_comm);
+    ZF_LOGD("Response msg time is %llu ns", resp_time);
+}
+
+static void send_table_req(
+        const uint8_t table)
+{
+    hobd_msg_s * const tx_msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
+
+    if(table == HOBD_TABLE_10)
+    {
+        comm_fill_msg_subgroub_10_query(tx_msg);
+    }
+    else if(table == HOBD_TABLE_D1)
+    {
+        comm_fill_msg_subgroub_d1_query(tx_msg);
+    }
+    else
+    {
+        assert(table != table);
+    }
+
+    comm_send_msg(tx_msg, &g_comm);
+}
+
+static void comm_update_state(void)
+{
+    /* TODO - error/non-blocking */
+    if(g_comm.state == COMM_STATE_GPIO_INIT)
+    {
+        /* perform the ECU diagnostic init sequence */
+        ecu_init_seq();
+        g_comm.state = COMM_STATE_SEND_ECU_INIT;
+    }
+    else if(g_comm.state == COMM_STATE_SEND_ECU_INIT)
+    {
+        /* establish a diagnostics connection with the ECU */
+        send_ecu_diag_messages();
+        wait_for_resp(HOBD_MSG_SUBTYPE_INIT);
+        g_comm.state = COMM_STATE_SEND_REQ0;
+    }
+    else if(g_comm.state == COMM_STATE_SEND_REQ0)
+    {
+        send_table_req(HOBD_TABLE_10);
+        wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP);
+        g_comm.state = COMM_STATE_SEND_REQ1;
+    }
+    else if(g_comm.state == COMM_STATE_SEND_REQ1)
+    {
+        send_table_req(HOBD_TABLE_D1);
+        wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP);
+        g_comm.state = COMM_STATE_SEND_REQ0;
+    }
+}
+
 static void obd_comm_thread_fn(void)
 {
     int err;
-    gpio_t uart_tx_gpio;
 
     /* wait for system ready */
     system_module_wait_for_start();
@@ -95,59 +193,17 @@ static void obd_comm_thread_fn(void)
             &g_comm.gpio_sys,
             GPIOID(UART_TX_PORT, UART_TX_PIN),
             GPIO_DIR_OUT,
-            &uart_tx_gpio);
+            &g_comm.gpio_uart_tx);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
 
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
-    /* perform the init sequence */
-    comm_gpio_init_seq(&uart_tx_gpio, &g_comm);
+    g_comm.state = COMM_STATE_GPIO_INIT;
 
-    /* reconfigure the serial port */
-    err = serial_configure(
-            &g_comm.char_dev,
-            115200,
-            8,
-            PARITY_NONE,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
-
-    /* establish a diagnostics connection with the ECU */
-    send_ecu_diag_messages();
-
-    /* TODO */
-    {
-        const hobd_msg_s * const resp_msg = comm_recv_msg(
-                &g_msg_parser,
-                &g_comm);
-
-        (void) resp_msg;
-        uint64_t resp_time;
-        comm_timestamp(&resp_time, &g_comm);
-        ZF_LOGD("response msg time is %llu ns", resp_time);
-    }
-
-    /* TODO - reorganize this more once comm. management is implemented */
-    /* TODO - better parser, handle bad data/comms/etc */
+    /* TODO - handle bad data/comms/etc */
     while(1)
     {
-        hobd_msg_s * const tx_msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
-
-        comm_fill_msg_subgroub_10_query(tx_msg);
-
-        comm_send_msg(tx_msg, &g_comm);
-
-        const hobd_msg_s * const msg = comm_recv_msg(
-                &g_msg_parser,
-                &g_comm);
-
-        (void) msg;
-
-        /* example */
-        uint64_t time;
-        comm_timestamp(&time, &g_comm);
-
-        ZF_LOGD("time is %llu ns", time);
+        comm_update_state();
     }
 
     /* should not get here, intentional halt */
