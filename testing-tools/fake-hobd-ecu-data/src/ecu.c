@@ -18,8 +18,8 @@
 #include "hobd_parser.h"
 #include "ecu.h"
 
-/* 1 ms */
-#define POST_SEND_DELAY_US (1000)
+/* 5 ms */
+#define POST_SEND_DELAY_US (5000)
 
 typedef enum
 {

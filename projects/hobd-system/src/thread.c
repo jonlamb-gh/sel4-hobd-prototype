@@ -40,14 +40,14 @@ void thread_create(
 
     /* create a new TCB */
     err = vka_alloc_tcb(&env->vka, &thread->tcb_object);
-    ZF_LOGF_IF(err != 0, "Failed to allocate new TCB\n");
+    ZF_LOGF_IF(err != 0, "Failed to allocate new TCB");
 
     /* get a frame cap for the IPC buffer */
     err = vka_alloc_frame(
             &env->vka,
             THREAD_IPC_BUFFER_FRAME_SIZE_BITS,
             &thread->ipc_frame_object);
-    ZF_LOGF_IF(err != 0, "Failed to allocate a frame for the IPC buffer\n");
+    ZF_LOGF_IF(err != 0, "Failed to allocate a frame for the IPC buffer");
 
     /* create a IPC buffer and capability for it */
     seL4_CPtr ipc_pd_cap = 0;
@@ -64,7 +64,7 @@ void thread_create(
     err = vka_cspace_alloc(
             &env->vka,
             &fault_ep);
-    ZF_LOGF_IF(err != 0, "Failed to allocate thread fault endpoint\n");
+    ZF_LOGF_IF(err != 0, "Failed to allocate thread fault endpoint");
 
     ZF_LOGD("Minting fault ep 0x%X for thread '%s'", fault_ep, name);
 
@@ -78,7 +78,7 @@ void thread_create(
             seL4_WordBits,
             seL4_AllRights,
             ipc_badge);
-    ZF_LOGF_IF(err != 0, "Failed to mint badged endpoint for thread\n");
+    ZF_LOGF_IF(err != 0, "Failed to mint badged endpoint for thread");
 
     /* initialise the new TCB */
     err = seL4_TCB_Configure(
@@ -90,7 +90,7 @@ void thread_create(
             seL4_NilData,
             (seL4_Word) ipc_buffer,
             thread->ipc_frame_object.cptr);
-    ZF_LOGF_IF(err != 0, "Failed to configure new TCB object\n");
+    ZF_LOGF_IF(err != 0, "Failed to configure new TCB object");
 
 #ifdef CONFIG_DEBUG_BUILD
     seL4_DebugNameThread(thread->tcb_object.cptr, name);
@@ -119,7 +119,7 @@ void thread_create(
 
     /* write the TCB registers. */
     err = seL4_TCB_WriteRegisters(thread->tcb_object.cptr, 0, 0, regs_size, &regs);
-    ZF_LOGF_IF(err != 0, "Failed to write new thread's register set\n");
+    ZF_LOGF_IF(err != 0, "Failed to write new thread's register set");
 
     ZF_LOGD("Created thread '%s' - stack size %" PRIu32 " bytes", name, stack_size);
 }
@@ -132,7 +132,7 @@ void thread_set_priority(
             thread->tcb_object.cptr,
             seL4_CapInitThreadTCB,
             seL4_MaxPrio);
-    ZF_LOGF_IF(err != 0, "Failed to set thread priority\n");
+    ZF_LOGF_IF(err != 0, "Failed to set thread priority");
 }
 
 void thread_set_affinity(
@@ -144,7 +144,7 @@ void thread_set_affinity(
     const int err = seL4_TCB_SetAffinity(
             thread->tcb_object.cptr,
             affinity);
-    ZF_LOGF_IF(err != 0, "Failed to set thread's affinity\n");
+    ZF_LOGF_IF(err != 0, "Failed to set thread's affinity");
 #endif
 }
 
@@ -152,5 +152,5 @@ void thread_start(
         thread_s * const thread)
 {
     const int err = seL4_TCB_Resume(thread->tcb_object.cptr);
-    ZF_LOGF_IF(err != 0, "Failed to start new thread\n");
+    ZF_LOGF_IF(err != 0, "Failed to start new thread");
 }

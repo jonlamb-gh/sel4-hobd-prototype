@@ -26,7 +26,7 @@ static volatile seL4_Word g_is_init = 0;
 static void signal_ready_to_start(void)
 {
     const int err = sync_mutex_unlock(&g_sys_ready_mutex);
-    ZF_LOGF_IF(err != 0, "Failed to signal system ready to start - failed to unlock mutex\n");
+    ZF_LOGF_IF(err != 0, "Failed to signal system ready to start - failed to unlock mutex");
 
     ZF_LOGD("System starting");
 }
@@ -67,7 +67,7 @@ void system_module_init(
 
     /* create the system-ready mutex */
     err = sync_mutex_new(&env->vka, &g_sys_ready_mutex);
-    ZF_LOGF_IF(err != 0, "Failed to create new mutex\n");
+    ZF_LOGF_IF(err != 0, "Failed to create new mutex");
 
     /* create the system thread */
     thread_create(
@@ -99,8 +99,8 @@ void system_module_wait_for_start(void)
     }
 
     err = sync_mutex_lock(&g_sys_ready_mutex);
-    ZF_LOGF_IF(err != 0, "Failed to lock mutex\n");
+    ZF_LOGF_IF(err != 0, "Failed to lock mutex");
 
     err = sync_mutex_unlock(&g_sys_ready_mutex);
-    ZF_LOGF_IF(err != 0, "Failed to unlock mutex\n");
+    ZF_LOGF_IF(err != 0, "Failed to unlock mutex");
 }

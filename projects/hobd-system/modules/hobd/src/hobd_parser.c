@@ -100,9 +100,9 @@ void hobd_parser_init(
         const uint16_t rx_buffer_size,
         hobd_parser_s * const parser)
 {
-    ZF_LOGF_IF(rx_buffer == NULL, "User provided Rx buffer is invalid\n");
-    ZF_LOGF_IF(rx_buffer_size <= HOBD_MSG_SIZE_MIN, "User provided Rx buffer is too small\n");
-    ZF_LOGF_IF(parser == NULL, "User provided parser is invalid\n");
+    ZF_LOGF_IF(rx_buffer == NULL, "User provided Rx buffer is invalid");
+    ZF_LOGF_IF(rx_buffer_size <= HOBD_MSG_SIZE_MIN, "User provided Rx buffer is too small");
+    ZF_LOGF_IF(parser == NULL, "User provided parser is invalid");
 
     parser->state = HOBD_PARSER_STATE_GET_TYPE;
 

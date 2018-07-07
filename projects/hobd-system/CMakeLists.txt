@@ -17,6 +17,7 @@ ApplyData61ElfLoaderSettings()
 
 add_executable(
     hobd-system
+    modules/time_server/src/time_server_module.c
     modules/hobd/src/hobd_parser.c
     modules/hobd/src/comm.c
     modules/hobd/src/hobd_module.c
@@ -55,6 +56,7 @@ target_compile_options(
 target_include_directories(
     hobd-system
     PRIVATE
+    modules/time_server/include
     modules/hobd/include
     modules/system/include
     include)

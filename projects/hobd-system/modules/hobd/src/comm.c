@@ -28,7 +28,7 @@ void comm_timestamp(
     comm_s * const comm)
 {
     const int err = ltimer_get_time(&comm->timer, time);
-    ZF_LOGF_IF(err != 0, "Failed to get time\n");
+    ZF_LOGF_IF(err != 0, "Failed to get time");
 }
 
 void comm_gpio_init_seq(
@@ -39,13 +39,13 @@ void comm_gpio_init_seq(
 
     /* pull k-line low for 70 ms */
     err = gpio_clr(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO\n");
+    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO");
 
     ps_mdelay(70);
 
     /* return to high, wait 120 ms */
     err = gpio_set(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO\n");
+    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO");
 
     ps_mdelay(120);
 }

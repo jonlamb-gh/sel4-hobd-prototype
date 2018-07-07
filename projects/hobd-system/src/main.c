@@ -34,6 +34,7 @@
 #include "platform.h"
 #include "root_task.h"
 #include "thread.h"
+#include "time_server_module.h"
 #include "system_module.h"
 #include "hobd_module.h"
 
@@ -64,8 +65,12 @@ int main(
             &g_mem_pool[0],
             &env);
 
+    /* initialize global services */
+    time_server_module_init(&env);
+
     /* initialize modules */
-    hobd_module_init(&env);
+    /* TODO */
+    //hobd_module_init(&env);
     system_module_init(&env);
 
     debug_dump_scheduler();

@@ -65,7 +65,7 @@ static void ecu_init_seq(void)
             8,
             PARITY_NONE,
             1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port\n");
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port");
 }
 
 static void send_ecu_diag_messages(void)
@@ -194,7 +194,7 @@ static void obd_comm_thread_fn(void)
             GPIOID(UART_TX_PORT, UART_TX_PIN),
             GPIO_DIR_OUT,
             &g_comm.gpio_uart_tx);
-    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin\n");
+    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin");
 
     ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
 
@@ -217,13 +217,13 @@ static void init_timer(
     uint64_t time;
 
     err = ltimer_default_init(&g_comm.timer, env->io_ops);
-    ZF_LOGF_IF(err != 0, "Failed to initialize timer\n");
+    ZF_LOGF_IF(err != 0, "Failed to initialize timer");
 
     err = ltimer_reset(&g_comm.timer);
-    ZF_LOGF_IF(err != 0, "Failed to reset timer\n");
+    ZF_LOGF_IF(err != 0, "Failed to reset timer");
 
     err = ltimer_get_time(&g_comm.timer, &time);
-    ZF_LOGF_IF(err != 0, "Failed to get time\n");
+    ZF_LOGF_IF(err != 0, "Failed to get time");
 
     ZF_LOGD("Created timer - current time is %llu ns", time);
 }
@@ -238,13 +238,13 @@ static void init_gpio(
             &env->io_ops,
             NULL,
             &env->io_ops.mux_sys);
-    ZF_LOGF_IF(err != 0, "Failed to initialize MUX subsystem\n");
+    ZF_LOGF_IF(err != 0, "Failed to initialize MUX subsystem");
 
     /* initialize the GPIO subsystem */
     err = gpio_sys_init(
             &env->io_ops,
             &g_comm.gpio_sys);
-    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem\n");
+    ZF_LOGF_IF(err != 0, "Failed to initialize GPIO subsystem");
 }
 
 static void init_uart(
@@ -255,7 +255,7 @@ static void init_uart(
             PS_SERIAL0,
             &env->io_ops,
             &g_comm.char_dev);
-    ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device\n");
+    ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device");
 }
 
 void hobd_module_init(
