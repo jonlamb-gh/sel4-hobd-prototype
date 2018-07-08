@@ -198,6 +198,7 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
+            /* TODO - callback/signal */
             g_comm.state = COMM_STATE_SEND_REQ1;
             ZF_LOGD("->STATE_SEND_REQ1");
         }
@@ -215,6 +216,7 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
+            /* TODO - callback/signal */
             g_comm.state = COMM_STATE_SEND_REQ0;
             ZF_LOGD("->STATE_SEND_REQ0");
         }
