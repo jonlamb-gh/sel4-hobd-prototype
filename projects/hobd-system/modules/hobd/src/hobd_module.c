@@ -35,7 +35,7 @@
 /* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 */
 //#define UART_TX_PORT (GPIO_BANK6)
 //#define UART_TX_PIN (17)
-#define UART_TX_PORT (GPIO_BANK1)
+#define UART_TX_PORT (GPIO_BANK2)
 #define UART_TX_PIN (1)
 
 #define MSG_RX_BUFFER_SIZE (512)
