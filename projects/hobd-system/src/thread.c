@@ -148,19 +148,6 @@ void thread_set_affinity(
 #endif
 }
 
-void thread_set_affinity(
-        const seL4_Word affinity,
-        thread_s * const thread)
-{
-    /* set affinity */
-#if CONFIG_MAX_NUM_NODES > 1
-    const int err = seL4_TCB_SetAffinity(
-            thread->tcb_object.cptr,
-            affinity);
-    ZF_LOGF_IF(err != 0, "Failed to set thread's affinity\n");
-#endif
-}
-
 void thread_start(
         thread_s * const thread)
 {
