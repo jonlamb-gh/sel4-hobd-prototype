@@ -26,6 +26,7 @@ typedef enum
 typedef struct
 {
     comm_state_kind state;
+    uint32_t timeout_id;
     ps_chardevice_t char_dev;
     gpio_sys_t gpio_sys;
     gpio_t gpio_uart_tx;

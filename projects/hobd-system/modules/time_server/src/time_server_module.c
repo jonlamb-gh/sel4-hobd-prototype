@@ -166,8 +166,6 @@ void time_server_register_periodic_cb(
         const time_server_timeout_cb_fn_t const callback,
         uintptr_t token)
 {
-    ZF_LOGD("Registering periodic timeout ID = 0x%lX", (unsigned long) id);
-
     const int err = tm_register_periodic_cb(
             &g_tm,
             period,
@@ -177,6 +175,34 @@ void time_server_register_periodic_cb(
             token);
     ZF_LOGF_IF(
             err != 0,
-            "Failed to register timeout callback with ID = 0x%lX",
+            "Failed to register periodic timeout callback with ID = 0x%lX",
+            (unsigned long) id);
+}
+
+void time_server_register_rel_cb(
+        const uint64_t time,
+        const uint32_t id,
+        const time_server_timeout_cb_fn_t const callback,
+        uintptr_t token)
+{
+    const int err = tm_register_rel_cb(
+            &g_tm,
+            time,
+            id,
+            (timeout_cb_fn_t) callback,
+            token);
+    ZF_LOGF_IF(
+            err != 0,
+            "Failed to register relative timeout callback with ID = 0x%lX",
+            (unsigned long) id);
+}
+
+void time_server_deregister_cb(
+        const uint32_t id)
+{
+    const int err = tm_deregister_cb(&g_tm, (unsigned int) id);
+    ZF_LOGF_IF(
+            err != 0,
+            "Failed to deregister timeout callback with ID = 0x%lX",
             (unsigned long) id);
 }

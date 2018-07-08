@@ -43,6 +43,8 @@
 
 #define HOBD_KLINE_BAUD (10400UL)
 
+#define COMM_RX_NO_DATA_TIMEOUT_NS MS_TO_NS(400ULL)
+
 static comm_s g_comm;
 
 static thread_s g_thread;
@@ -51,6 +53,23 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
+
+static int timeout_cb(
+        uintptr_t token)
+{
+    ZF_LOGD("timeout cb");
+
+    return 0;
+}
+
+static void start_timeout(void)
+{
+    time_server_register_rel_cb(
+            COMM_RX_NO_DATA_TIMEOUT_NS,
+            g_comm.timeout_id,
+            &timeout_cb,
+            (uintptr_t) g_comm.timeout_id);
+}
 
 static void ecu_init_seq(void)
 {
@@ -157,7 +176,11 @@ static void comm_update_state(void)
     {
         /* establish a diagnostics connection with the ECU */
         send_ecu_diag_messages();
+
+        /* start timeout and wait for a response */
+        start_timeout();
         wait_for_resp(HOBD_MSG_SUBTYPE_INIT);
+
         g_comm.state = COMM_STATE_SEND_REQ0;
     }
     else if(g_comm.state == COMM_STATE_SEND_REQ0)
@@ -180,6 +203,9 @@ static void obd_comm_thread_fn(void)
 
     /* wait for system ready */
     system_module_wait_for_start();
+
+    /* create a timeout id */
+    time_server_alloc_id(&g_comm.timeout_id);
 
     /* initialize the HOBD parser */
     hobd_parser_init(
