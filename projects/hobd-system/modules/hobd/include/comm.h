@@ -15,6 +15,8 @@
 #include "hobd_parser.h"
 #include "hobd_kline.h"
 
+#define COMM_RX_NO_DATA_TIMEOUT_NS MS_TO_NS(400ULL)
+
 typedef enum
 {
     COMM_STATE_GPIO_INIT = 0,
@@ -27,6 +29,7 @@ typedef struct
 {
     comm_state_kind state;
     uint32_t timeout_id;
+    volatile seL4_Word timeout_signaled;
     ps_chardevice_t char_dev;
     gpio_sys_t gpio_sys;
     gpio_t gpio_uart_tx;
@@ -34,6 +37,15 @@ typedef struct
 
 /* TODO - comm init/reset/etc */
 /* TODO - handle errors instead of assert */
+
+uint32_t comm_get_timeout(
+        comm_s * const comm);
+
+void comm_stop_timeout(
+        comm_s * const comm);
+
+void comm_start_timeout(
+        comm_s * const comm);
 
 void comm_gpio_init_seq(
         gpio_t * const gpio,
@@ -43,8 +55,8 @@ void comm_send_msg(
         const hobd_msg_s * const msg,
         comm_s * const comm);
 
-/* TODO - timeouts ? */
 hobd_msg_s *comm_recv_msg(
+        const uint32_t use_timeout,
         hobd_parser_s * const parser,
         comm_s * const comm);
 

@@ -18,10 +18,49 @@
 #include <sel4debug/debug.h>
 
 #include "config.h"
+#include "time_server_module.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
 #include "hobd_msg.h"
 #include "comm.h"
+
+static int timeout_cb(
+        uintptr_t token)
+{
+    ZF_LOGF_IF(token == 0, "Invalid token, expexted comm_s pointer");
+
+    /* TODO - is this atomic? do I need __sync_...? */
+    comm_s * const comm = (comm_s*) token;
+    comm->timeout_signaled = 1;
+
+    return 0;
+
+}
+
+uint32_t comm_get_timeout(
+        comm_s * const comm)
+{
+    return (uint32_t) comm->timeout_signaled;
+}
+
+void comm_stop_timeout(
+        comm_s * const comm)
+{
+    time_server_deregister_cb(comm->timeout_id);
+    comm->timeout_signaled = 0;
+}
+
+void comm_start_timeout(
+        comm_s * const comm)
+{
+    comm_stop_timeout(comm);
+
+    time_server_register_rel_cb(
+            COMM_RX_NO_DATA_TIMEOUT_NS,
+            comm->timeout_id,
+            &timeout_cb,
+            (uintptr_t) comm);
+}
 
 void comm_gpio_init_seq(
         gpio_t * const gpio,
@@ -62,14 +101,20 @@ void comm_send_msg(
             (unsigned int) msg->header.subtype);
 }
 
-/* TODO - timeouts ? */
 hobd_msg_s *comm_recv_msg(
+        const uint32_t use_timeout,
         hobd_parser_s * const parser,
         comm_s * const comm)
 {
     hobd_msg_s *msg = NULL;
+    uint32_t timeout_fired = 0;
 
-    while(msg == NULL)
+    if(use_timeout != 0)
+    {
+        comm_start_timeout(comm);
+    }
+
+    while((msg == NULL) && (timeout_fired == 0))
     {
         const int data = ps_cdev_getchar(&comm->char_dev);
 
@@ -92,6 +137,16 @@ hobd_msg_s *comm_recv_msg(
                     (unsigned int) msg->header.subtype);
             }
         }
+
+        if(use_timeout != 0)
+        {
+            timeout_fired = comm_get_timeout(comm);
+        }
+    }
+
+    if(use_timeout != 0)
+    {
+        comm_stop_timeout(comm);
     }
 
     return msg;

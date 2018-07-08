@@ -43,8 +43,6 @@
 
 #define HOBD_KLINE_BAUD (10400UL)
 
-#define COMM_RX_NO_DATA_TIMEOUT_NS MS_TO_NS(400ULL)
-
 static comm_s g_comm;
 
 static thread_s g_thread;
@@ -53,23 +51,6 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
-
-static int timeout_cb(
-        uintptr_t token)
-{
-    ZF_LOGD("timeout cb");
-
-    return 0;
-}
-
-static void start_timeout(void)
-{
-    time_server_register_rel_cb(
-            COMM_RX_NO_DATA_TIMEOUT_NS,
-            g_comm.timeout_id,
-            &timeout_cb,
-            (uintptr_t) g_comm.timeout_id);
-}
 
 static void ecu_init_seq(void)
 {
@@ -115,31 +96,45 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 }
 
-/* TODO - timeout */
-static void wait_for_resp(
-        const uint8_t subtype)
+static uint32_t wait_for_resp(
+        const uint8_t subtype,
+        const uint32_t use_timeout)
 {
-    uint8_t resp_found = 0;
+    uint32_t resp_found = 0;
+    uint32_t timeout_fired = 0;
 
-    while(resp_found == 0)
+    while((resp_found == 0) && (timeout_fired == 0))
     {
         const hobd_msg_s * const msg = comm_recv_msg(
+                use_timeout,
                 &g_msg_parser,
                 &g_comm);
 
-        if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+        if(msg != NULL)
         {
-            if(msg->header.subtype == subtype)
+            if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
             {
-                resp_found = 1;
+                if(msg->header.subtype == subtype)
+                {
+                    resp_found = 1;
+                }
             }
+        }
+        else
+        {
+            timeout_fired = 1;
         }
     }
 
     /* TODO - testing */
-    uint64_t resp_time;
-    time_server_get_time(&resp_time);
-    ZF_LOGD("Response msg time is %llu ns", resp_time);
+    if(resp_found != 0)
+    {
+        uint64_t resp_time;
+        time_server_get_time(&resp_time);
+        ZF_LOGD("Response msg time is %llu ns", resp_time);
+    }
+
+    return resp_found;
 }
 
 static void send_table_req(
@@ -166,11 +161,15 @@ static void send_table_req(
 static void comm_update_state(void)
 {
     /* TODO - error/non-blocking */
+
+    /* TODO - better state managment, retry current state, fallback state, etc */
+
     if(g_comm.state == COMM_STATE_GPIO_INIT)
     {
         /* perform the ECU diagnostic init sequence */
         ecu_init_seq();
         g_comm.state = COMM_STATE_SEND_ECU_INIT;
+        ZF_LOGD("->STATE_SEND_ECU_INIT");
     }
     else if(g_comm.state == COMM_STATE_SEND_ECU_INIT)
     {
@@ -178,22 +177,52 @@ static void comm_update_state(void)
         send_ecu_diag_messages();
 
         /* start timeout and wait for a response */
-        start_timeout();
-        wait_for_resp(HOBD_MSG_SUBTYPE_INIT);
+        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_INIT, 1);
 
-        g_comm.state = COMM_STATE_SEND_REQ0;
+        if(msg_found == 1)
+        {
+            g_comm.state = COMM_STATE_SEND_REQ0;
+            ZF_LOGD("->STATE_SEND_REQ0");
+        }
+        else
+        {
+            g_comm.state = COMM_STATE_GPIO_INIT;
+            ZF_LOGD("<-STATE_GPIO_INIT");
+        }
     }
     else if(g_comm.state == COMM_STATE_SEND_REQ0)
     {
         send_table_req(HOBD_TABLE_10);
-        wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP);
-        g_comm.state = COMM_STATE_SEND_REQ1;
+
+        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+
+        if(msg_found == 1)
+        {
+            g_comm.state = COMM_STATE_SEND_REQ1;
+            ZF_LOGD("->STATE_SEND_REQ1");
+        }
+        else
+        {
+            g_comm.state = COMM_STATE_SEND_ECU_INIT;
+            ZF_LOGD("<-STATE_SEND_ECU_INIT");
+        }
     }
     else if(g_comm.state == COMM_STATE_SEND_REQ1)
     {
         send_table_req(HOBD_TABLE_D1);
-        wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP);
-        g_comm.state = COMM_STATE_SEND_REQ0;
+
+        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+
+        if(msg_found == 1)
+        {
+            g_comm.state = COMM_STATE_SEND_REQ0;
+            ZF_LOGD("->STATE_SEND_REQ0");
+        }
+        else
+        {
+            g_comm.state = COMM_STATE_SEND_ECU_INIT;
+            ZF_LOGD("<-STATE_SEND_ECU_INIT");
+        }
     }
 }
 

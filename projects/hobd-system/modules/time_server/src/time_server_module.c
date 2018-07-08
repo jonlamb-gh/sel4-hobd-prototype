@@ -49,8 +49,6 @@ static void time_server_thread_fn(void)
         seL4_Word mbadge = 0;
         seL4_Wait(g_timer_ntfn.cptr, &mbadge);
 
-        ZF_LOGD("timer-server IRQ - badge = 0x%X", mbadge);
-
         sel4platsupport_handle_timer_irq(&g_timer, mbadge);
 
         err = tm_update(&g_tm);
