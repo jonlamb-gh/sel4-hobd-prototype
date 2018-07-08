@@ -152,7 +152,7 @@ static void send_table_req(
     }
     else
     {
-        assert(table != table);
+        assert(false);
     }
 
     comm_send_msg(tx_msg, &g_comm);

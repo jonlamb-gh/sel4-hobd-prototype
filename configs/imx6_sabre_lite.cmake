@@ -8,6 +8,7 @@ set(KernelOptimisation "-O2" CACHE STRING "")
 set(KernelBenchmarks "none" CACHE STRING "")
 set(KernelDangerousCodeInjection OFF CACHE BOOL "")
 set(KernelFastpath ON CACHE BOOL "")
+set(ElfloaderImage "elf" CACHE STRING "")
 
 set(KernelVerificationBuild OFF CACHE BOOL "" FORCE)
 set(KernelDebugBuild ON CACHE BOOL "" FORCE)

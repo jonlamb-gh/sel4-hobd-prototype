@@ -37,13 +37,13 @@ void time_server_register_periodic_cb(
         const uint64_t period,
         const uint64_t start,
         const uint32_t id,
-        const time_server_timeout_cb_fn_t const callback,
+        const time_server_timeout_cb_fn_t callback,
         uintptr_t token);
 
 void time_server_register_rel_cb(
         const uint64_t time,
         const uint32_t id,
-        const time_server_timeout_cb_fn_t const callback,
+        const time_server_timeout_cb_fn_t callback,
         uintptr_t token);
 
 void time_server_deregister_cb(
