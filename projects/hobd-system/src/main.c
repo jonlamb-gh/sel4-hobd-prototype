@@ -65,11 +65,9 @@ int main(
             &g_mem_pool[0],
             &env);
 
-    /* initialize global services */
+    /* initialize modules, not all of them will wait for the system module to start */
     time_server_module_init(&env);
-
-    /* initialize modules */
-    /* TODO */
+    /* TODO - re-enable after timer work */
     //hobd_module_init(&env);
     system_module_init(&env);
 

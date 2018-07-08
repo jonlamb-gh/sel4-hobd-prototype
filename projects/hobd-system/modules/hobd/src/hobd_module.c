@@ -22,6 +22,7 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "time_server_module.h"
 #include "system_module.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
@@ -118,7 +119,7 @@ static void wait_for_resp(
 
     /* TODO - testing */
     uint64_t resp_time;
-    comm_timestamp(&resp_time, &g_comm);
+    time_server_get_time(&resp_time);
     ZF_LOGD("Response msg time is %llu ns", resp_time);
 }
 
@@ -210,24 +211,6 @@ static void obd_comm_thread_fn(void)
     seL4_DebugHalt();
 }
 
-static void init_timer(
-        init_env_s * const env)
-{
-    int err;
-    uint64_t time;
-
-    err = ltimer_default_init(&g_comm.timer, env->io_ops);
-    ZF_LOGF_IF(err != 0, "Failed to initialize timer");
-
-    err = ltimer_reset(&g_comm.timer);
-    ZF_LOGF_IF(err != 0, "Failed to reset timer");
-
-    err = ltimer_get_time(&g_comm.timer, &time);
-    ZF_LOGF_IF(err != 0, "Failed to get time");
-
-    ZF_LOGD("Created timer - current time is %llu ns", time);
-}
-
 static void init_gpio(
         init_env_s * const env)
 {
@@ -261,7 +244,6 @@ static void init_uart(
 void hobd_module_init(
         init_env_s * const env)
 {
-    init_timer(env);
     init_gpio(env);
     init_uart(env);
 

@@ -23,14 +23,6 @@
 #include "hobd_msg.h"
 #include "comm.h"
 
-void comm_timestamp(
-    uint64_t * const time,
-    comm_s * const comm)
-{
-    const int err = ltimer_get_time(&comm->timer, time);
-    ZF_LOGF_IF(err != 0, "Failed to get time");
-}
-
 void comm_gpio_init_seq(
         gpio_t * const gpio,
         comm_s * const comm)

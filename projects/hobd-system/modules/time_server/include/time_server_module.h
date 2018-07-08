@@ -7,14 +7,18 @@
 #ifndef TIME_SERVER_MODULE_H
 #define TIME_SERVER_MODULE_H
 
+#include <stdint.h>
+
 #include "init_env.h"
 
-// TODO - make a time_server module with thread to handle IRQs
-// TIMER refs
-// https://github.com/seL4/sel4test/blob/master/apps/sel4test-driver/src/main.c#L179
-// https://github.com/SEL4PROJ/rumprun-sel4-demoapps/blob/master/roottask/src/main.c#L279
+/* could make a seperate time_server.h ? */
+/* TODO - not thread safe yet */
 
 void time_server_module_init(
         init_env_s * const env);
+
+/* nanoseconds */
+void time_server_get_time(
+        uint64_t * const time);
 
 #endif /* TIME_SERVER_MODULE_H */

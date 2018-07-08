@@ -11,7 +11,6 @@
 
 #include <platsupport/chardev.h>
 #include <platsupport/gpio.h>
-#include <platsupport/ltimer.h>
 
 #include "hobd_parser.h"
 #include "hobd_kline.h"
@@ -28,18 +27,12 @@ typedef struct
 {
     comm_state_kind state;
     ps_chardevice_t char_dev;
-    ltimer_t timer;
     gpio_sys_t gpio_sys;
     gpio_t gpio_uart_tx;
 } comm_s;
 
 /* TODO - comm init/reset/etc */
-/* TODO - probably should handle errors instead of assert */
-
-/* nanoseconds */
-void comm_timestamp(
-    uint64_t * const time,
-    comm_s * const comm);
+/* TODO - handle errors instead of assert */
 
 void comm_gpio_init_seq(
         gpio_t * const gpio,

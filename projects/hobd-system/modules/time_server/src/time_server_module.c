@@ -23,6 +23,8 @@
 #include "thread.h"
 #include "time_server_module.h"
 
+#define MAX_TIMEOUTS (1)
+
 /* TODO - which things should be in the init_env? */
 
 /* main timer notification that receives ltimer IRQ on */
@@ -82,6 +84,28 @@ static void init_timer(
             g_timer_ntfn.cptr,
             &g_timer);
     ZF_LOGF_IF(err != 0, "Failed to initialize timer");
+
+    err = ltimer_reset(&g_timer.ltimer);
+    ZF_LOGF_IF(err != 0, "Failed to reset timer");
+}
+
+static void init_tm(
+        init_env_s * const env)
+{
+    int err;
+    uint64_t init_time;
+
+    err = tm_init(
+            &g_tm,
+            &g_timer.ltimer,
+            &env->io_ops,
+            MAX_TIMEOUTS);
+    ZF_LOGF_IF(err != 0, "Failed to initialize local time manager");
+
+    err = tm_get_time(&g_tm, &init_time);
+    ZF_LOGF_IF(err != 0, "Failed to get time");
+
+    ZF_LOGD("Created timer - current time is %llu ns", init_time);
 }
 
 void time_server_module_init(
@@ -108,24 +132,7 @@ void time_server_module_init(
     ZF_LOGF_IF(err != 0, "Failed to bind timer notification to thread TCB");
 
     /* set up the timer manager */
-    err = tm_init(
-            &g_tm,
-            &g_timer.ltimer,
-            &env->io_ops,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to initialize local time manager");
-
-    err = ltimer_reset(&g_timer.ltimer);
-    ZF_LOGF_IF(err != 0, "Failed to reset timer");
-
-    uint64_t time;
-    err = ltimer_get_time(&g_timer.ltimer, &time);
-    ZF_LOGF_IF(err != 0, "Failed to get time");
-
-    ZF_LOGD("Created timer - current time is %llu ns", time);
-
-    /* https://github.com/seL4/util_libs/blob/master/libplatsupport/src/mach/imx/ltimer.c#L121 */
-    /* seems to be an issue there if current time is less than the amount to be subtracted ? */
+    init_tm(env);
 
     /* TESTING */
     unsigned int id;
@@ -136,7 +143,7 @@ void time_server_module_init(
 
     err = tm_register_periodic_cb(
             &g_tm,
-            1000 * 500, // ns
+            1000 * 1000 * 500, // ns
             0, // start
             id,
             &timer_callback,
@@ -151,4 +158,12 @@ void time_server_module_init(
 
     /* start the new thread */
     thread_start(&g_thread);
+}
+
+void time_server_get_time(
+        uint64_t * const time)
+{
+    /* TODO init/sanity checks */
+    const int err = tm_get_time(&g_tm, time);
+    ZF_LOGF_IF(err != 0, "Failed to get time");
 }
