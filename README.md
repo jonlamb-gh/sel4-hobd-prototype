@@ -179,7 +179,7 @@ wait_for_resp@hobd_module.c:134 Response msg time is 244738000 ns
 Running the [fake-hobd-ecu-data](testing-tools/fake-hobd-ecu-data/README.md) tool:
 
 ```bash
-$fake-hobd-ecu-data
+$ fake-hobd-ecu-data
 
 ->STATE_WAIT4_WAKEUP
 rx_msg[FE:04:FF]
