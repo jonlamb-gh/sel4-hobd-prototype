@@ -67,8 +67,7 @@ int main(
 
     /* initialize modules, not all of them will wait for the system module to start */
     time_server_module_init(&env);
-    /* TODO - re-enable after timer work */
-    //hobd_module_init(&env);
+    hobd_module_init(&env);
     system_module_init(&env);
 
     debug_dump_scheduler();

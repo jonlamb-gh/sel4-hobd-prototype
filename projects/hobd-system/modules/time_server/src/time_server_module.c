@@ -35,13 +35,6 @@ static time_manager_t g_tm;
 static thread_s g_thread;
 static uint64_t g_thread_stack[TMSERVERMOD_STACK_SIZE];
 
-static int timer_callback(uintptr_t id)
-{
-    ZF_LOGD("timer_callback");
-
-    return 0;
-}
-
 static void time_server_thread_fn(void)
 {
     int err;
@@ -134,22 +127,6 @@ void time_server_module_init(
     /* set up the timer manager */
     init_tm(env);
 
-    /* TESTING */
-    unsigned int id;
-    err = tm_alloc_id(&g_tm, &id);
-    ZF_LOGF_IF(err != 0, "Failed to allocate time manager ID");
-
-    ZF_LOGD("\nID = 0x%X", id);
-
-    err = tm_register_periodic_cb(
-            &g_tm,
-            1000 * 1000 * 500, // ns
-            0, // start
-            id,
-            &timer_callback,
-            id);
-    ZF_LOGF_IF(err != 0, "Failed to register timer callback with ID = 0x%X", id);
-
     /* set thread priority and affinity */
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(TMSERVERMOD_THREAD_AFFINITY, &g_thread);
@@ -166,4 +143,40 @@ void time_server_get_time(
     /* TODO init/sanity checks */
     const int err = tm_get_time(&g_tm, time);
     ZF_LOGF_IF(err != 0, "Failed to get time");
+}
+
+void time_server_alloc_id(
+        uint32_t * const id)
+{
+    unsigned int tm_id = 0;
+
+    const int err = tm_alloc_id(&g_tm, &tm_id);
+    ZF_LOGF_IF(err != 0, "Failed to allocate time manager ID");
+
+    if(err == 0)
+    {
+        *id = (uint32_t) tm_id;
+    }
+}
+
+void time_server_register_periodic_cb(
+        const uint64_t period,
+        const uint64_t start,
+        const uint32_t id,
+        const time_server_timeout_cb_fn_t const callback,
+        uintptr_t token)
+{
+    ZF_LOGD("Registering periodic timeout ID = 0x%lX", (unsigned long) id);
+
+    const int err = tm_register_periodic_cb(
+            &g_tm,
+            period,
+            start,
+            id,
+            (timeout_cb_fn_t) callback,
+            token);
+    ZF_LOGF_IF(
+            err != 0,
+            "Failed to register timeout callback with ID = 0x%lX",
+            (unsigned long) id);
 }
