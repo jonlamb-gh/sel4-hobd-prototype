@@ -130,37 +130,68 @@ init debug_print_bootinfo@bootinfo.c:44 0x101ac000 | 14 | 0
 2 untypeds of size 27
 ------------------------------
 
-platform_init@platform.c:89 Platform is initialized
-root_task_init@root_task.c:105 Created global fault ep 0x27B
+platform_init@platform.c:96 Platform is initialized
+root_task_init@root_task.c:105 Created global fault ep 0x287
 root_task_init@root_task.c:107 Root task is initialized
-thread_create@thread.c:69 Minting fault ep 0x2B4 for thread 'hobd'
-thread_create@thread.c:124 Created thread 'hobd' - stack size 4096 bytes
-hobd_module_init@hobd_module.c:122 hobd is initialized
-thread_create@thread.c:69 Minting fault ep 0x2E5 for thread 'sys'
+thread_create@thread.c:69 Minting fault ep 0x2A0 for thread 'time-server'
+thread_create@thread.c:124 Created thread 'time-server' - stack size 4096 bytes
+init_tm@time_server_module.c:99 Created timer - current time is 6464000 ns
+time_server_module_init@time_server_module.c:132 time-server is initialized
+thread_create@thread.c:69 Minting fault ep 0x2E3 for thread 'hobd-comm'
+thread_create@thread.c:124 Created thread 'hobd-comm' - stack size 8192 bytes
+hobd_module_init@hobd_module.c:319 hobd-comm is initialized
+thread_create@thread.c:69 Minting fault ep 0x2DA for thread 'sys'
 thread_create@thread.c:124 Created thread 'sys' - stack size 4096 bytes
 system_module_init@system_module.c:86 sys is initialized
-debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
+debug_dump_scheduler@main.c:48 Dumping scheduler (only core 0 TCBs will be displayed)
 
 Dumping all tcbs!
 Name                                            State           IP                       Prio    Core
 --------------------------------------------------------------------------------------
-sys                                             restart         0x11f30 255                     0
-hobd                                            restart         0x103e8 255                     0
+sys                                             restart         0x1588c 255                     0
+hobd-comm                                       restart         0x13e50 255                     0
+time-server                                     restart         0x11798 255                     0
 idle_thread                                     idle            (nil)   0                       0
-init                                            running         0x16214 255                     0
+init                                            running         0x19bfc 255                     0
 
 thread_fn@system_module.c:44 System ready to start
 signal_ready_to_start@system_module.c:31 System starting
-thread_fn@hobd_module.c:37 thread is running, about to intentionally fault
-main@main.c:82 Received fault on ep 0x27B - badge 0x21
-Pagefault from [fault-handler]: write fault at PC: 0x10454 vaddr: 0xdeadbeef, FSR 0x805
-debug_dump_scheduler@main.c:47 Dumping scheduler (only core 0 TCBs will be displayed)
+obd_comm_thread_fn@hobd_module.c:255 hobd-comm thread is running
+ecu_init_seq@hobd_module.c:57 Performing ECU GPIO initialization sequence
+time_server_thread_fn@time_server_module.c:42 time-server thread is running
+comm_update_state@hobd_module.c:172 ->STATE_SEND_ECU_INIT
+send_ecu_diag_messages@hobd_module.c:74 Sending ECU diagnostic messages
+comm_send_msg@comm.c:101 tx_msg[FE:04:FF]
+comm_send_msg@comm.c:101 tx_msg[72:05:00]
+comm_recv_msg@comm.c:137 rx_msg[02:04:00]
+wait_for_resp@hobd_module.c:134 Response msg time is 152580000 ns
+comm_update_state@hobd_module.c:185 ->STATE_SEND_REQ0
+comm_send_msg@comm.c:101 tx_msg[72:08:72]
+comm_recv_msg@comm.c:137 rx_msg[02:86:72]
+wait_for_resp@hobd_module.c:134 Response msg time is 199790000 ns
+comm_update_state@hobd_module.c:202 ->STATE_SEND_REQ1
+comm_send_msg@comm.c:101 tx_msg[72:08:72]
+comm_recv_msg@comm.c:137 rx_msg[02:0C:72]
+wait_for_resp@hobd_module.c:134 Response msg time is 244738000 ns
+...
+```
 
-Dumping all tcbs!
-Name                                            State           IP                       Prio    Core
---------------------------------------------------------------------------------------
-sys                                             running         0x10c10 255                     0
-hobd                                            blocked on reply        0x10454 255             0
-idle_thread                                     idle            (nil)   0                       0
-init                                            running         0x16214 255                     0
+Running the [fake-hobd-ecu-data](testing-tools/fake-hobd-ecu-data/README.md) tool:
+
+```bash
+$fake-hobd-ecu-data
+
+->STATE_WAIT4_WAKEUP
+rx_msg[FE:04:FF]
+->STATE_WAIT4_DIAG_INIT
+rx_msg[72:05:00]
+->STATE_ACTIVE_LISTEN
+tx_msg[02:04:00]
+rx_msg[72:08:72]
+tx_msg[02:86:72]
+rx_msg[72:08:72]
+tx_msg[02:0C:72]
+rx_msg[72:08:72]
+tx_msg[02:0C:72]
+...
 ```
