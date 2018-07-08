@@ -7,13 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
-#include <autoconf.h>
-#include <sel4/sel4.h>
-#include <utils/builtin.h>
-#include <utils/zf_log_if.h>
-
-#include "config.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
 
@@ -100,9 +95,9 @@ void hobd_parser_init(
         const uint16_t rx_buffer_size,
         hobd_parser_s * const parser)
 {
-    ZF_LOGF_IF(rx_buffer == NULL, "User provided Rx buffer is invalid\n");
-    ZF_LOGF_IF(rx_buffer_size <= HOBD_MSG_SIZE_MIN, "User provided Rx buffer is too small\n");
-    ZF_LOGF_IF(parser == NULL, "User provided parser is invalid\n");
+    assert(rx_buffer != NULL);
+    assert(rx_buffer_size > HOBD_MSG_SIZE_MIN);
+    assert(parser != NULL);
 
     parser->state = HOBD_PARSER_STATE_GET_TYPE;
 
@@ -237,5 +232,5 @@ uint8_t hobd_parser_checksum(
         cs = (0x0100 - cs);
     }
 
-    return (uint8_t) (cs & 0xFF);
+    return (uint8_t) (cs & 0x00FF);
 }

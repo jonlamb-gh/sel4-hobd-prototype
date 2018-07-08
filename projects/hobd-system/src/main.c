@@ -34,6 +34,7 @@
 #include "platform.h"
 #include "root_task.h"
 #include "thread.h"
+#include "time_server_module.h"
 #include "system_module.h"
 #include "hobd_module.h"
 
@@ -64,13 +65,12 @@ int main(
             &g_mem_pool[0],
             &env);
 
-    /* initialize modules */
+    /* initialize modules, not all of them will wait for the system module to start */
+    time_server_module_init(&env);
     hobd_module_init(&env);
     system_module_init(&env);
 
     debug_dump_scheduler();
-
-    /* TODO - global sync-start mutex ? */
 
     /* loop forever, servicing events/faults/etc */
     while(1)

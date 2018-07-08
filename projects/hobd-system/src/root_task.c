@@ -38,7 +38,7 @@ void root_task_init(
 
     /* get boot info */
     env->boot_info = platsupport_get_bootinfo();
-    ZF_LOGF_IF(env->boot_info == NULL, "Failed to get bootinfo\n");
+    ZF_LOGF_IF(env->boot_info == NULL, "Failed to get bootinfo");
 
     /* name this thread */
 #ifdef CONFIG_DEBUG_BUILD
@@ -59,7 +59,7 @@ void root_task_init(
             &env->simple,
             mem_pool_size,
             mem_pool);
-    ZF_LOGF_IF(env->allocman == NULL, "Failed to initialize alloc manager\n");
+    ZF_LOGF_IF(env->allocman == NULL, "Failed to initialize alloc manager");
 
     /* create a vka (interface for interacting with the underlying allocator) */
     allocman_make_vka(&env->vka, env->allocman);
@@ -73,7 +73,7 @@ void root_task_init(
             simple_get_pd(&env->simple),
             &env->vka,
             env->boot_info);
-    ZF_LOGF_IF(err != 0, "Failed to bootstrap vspace\n");
+    ZF_LOGF_IF(err != 0, "Failed to bootstrap vspace");
 
     /* fill the allocator with virtual memory */
     void *vaddr = NULL;
@@ -83,7 +83,7 @@ void root_task_init(
             seL4_AllRights,
             1,
             &vaddr);
-    ZF_LOGF_IF(env->virt_reservation.res == NULL, "Failed to reserve a chunk of memory.\n");
+    ZF_LOGF_IF(env->virt_reservation.res == NULL, "Failed to reserve a chunk of memory");
 
     bootstrap_configure_virtual_pool(
             env->allocman,
@@ -98,7 +98,7 @@ void root_task_init(
     err = vka_alloc_endpoint(
             &env->vka,
             &env->global_fault_ep_obj);
-    ZF_LOGF_IF(err != 0, "Failed to create global fault endpoint\n");
+    ZF_LOGF_IF(err != 0, "Failed to create global fault endpoint");
 
     env->global_fault_ep = env->global_fault_ep_obj.cptr;
 

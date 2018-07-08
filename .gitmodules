@@ -13,3 +13,6 @@
 [submodule "projects/musllibc"]
 	path = projects/musllibc
 	url = https://github.com/seL4/musllibc.git
+[submodule "projects/projects_libs"]
+	path = projects/projects_libs
+	url = https://github.com/SEL4PROJ/projects_libs.git

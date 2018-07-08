@@ -59,28 +59,33 @@ void platform_init(
             env->vspace,
             env->vka,
             &env->io_ops);
-    ZF_LOGF_IF(err != 0, "Failed to create new IO ops\n");
+    ZF_LOGF_IF(err != 0, "Failed to create new IO ops");
 
     /* initialize architecture I/O operations data */
     err = sel4platsupport_new_arch_ops(
             &env->io_ops,
             &env->simple,
             &env->vka);
-    ZF_LOGF_IF(err != 0, "Failed to initialize IO ops\n");
+    ZF_LOGF_IF(err != 0, "Failed to initialize IO ops");
 
     /* create a new I/O mapper which will be used to get the frame(s) */
     err = sel4platsupport_new_io_mapper(
             env->vspace,
             env->vka,
             &env->io_ops.io_mapper);
-    ZF_LOGF_IF(err != 0, "Failed to create new IO mapper\n");
+    ZF_LOGF_IF(err != 0, "Failed to create new IO mapper");
+
+    /* create new malloc ops */
+    err = sel4platsupport_new_malloc_ops(
+            &env->io_ops.malloc_ops);
+    ZF_LOGF_IF(err != 0, "Failed to create new malloc ops");
 
     /* create a dma manager, allocates at page granularity */
     err = sel4utils_new_page_dma_alloc(
             &env->vka,
             &env->vspace,
             &env->io_ops.dma_manager);
-    ZF_LOGF_IF(err != 0, "Failed to create new DMA manager\n");
+    ZF_LOGF_IF(err != 0, "Failed to create new DMA manager");
 
     /* initialize clock, set max frequency */
     init_clock(env);

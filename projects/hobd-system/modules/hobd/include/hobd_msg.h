@@ -27,8 +27,7 @@ static inline void hobd_msg_update_checksum(
 static inline uint8_t hobd_msg_no_data(
         const uint8_t type,
         const uint8_t subtype,
-        uint8_t * const buffer,
-        const uint16_t buffer_size)
+        uint8_t * const buffer)
 {
     hobd_msg_s * const msg = (hobd_msg_s*) &buffer[0];
 
@@ -46,8 +45,7 @@ static inline uint8_t hobd_msg(
         const uint8_t type,
         const uint8_t subtype,
         const uint8_t data_size,
-        uint8_t * const buffer,
-        const uint16_t buffer_size)
+        uint8_t * const buffer)
 {
     hobd_msg_s * const msg = (hobd_msg_s*) &buffer[0];
 
