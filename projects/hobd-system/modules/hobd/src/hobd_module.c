@@ -30,20 +30,10 @@
 #include "comm.h"
 #include "hobd_module.h"
 
-/* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
- * doesn't seem to support all the GPIOs */
 /* see 36.4 IOMUXC of TRM */
 /* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 - SW_PAD_CTL_PAD_SD3_DATA7 */
-/* pad control registers at 0x020E_0690, offset 0x690, struct sw_pad_ctl_pad_sd3_data7 */
-/*
-case GPIOID(GPIO_BANK6, 17):
-        reg = &m->iomuxc->sw_pad_ctl_pad_sd3_data7;
-        break;
-*/
 #define UART_TX_PORT (GPIO_BANK6)
 #define UART_TX_PIN (17)
-//#define UART_TX_PORT (GPIO_BANK2)
-//#define UART_TX_PIN (1)
 
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
