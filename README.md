@@ -27,6 +27,8 @@ See the `devel` branch for the most recent developments.
 ## Building
 
 ```bash
+./scripts/apply-patches
+
 ./scripts/build
 ```
 

@@ -1,0 +1,15 @@
+diff --git a/libplatsupport/src/plat/imx6/mux.c b/libplatsupport/src/plat/imx6/mux.c
+index fe8e384..2aa67bb 100644
+--- a/libplatsupport/src/plat/imx6/mux.c
++++ b/libplatsupport/src/plat/imx6/mux.c
+@@ -781,6 +781,10 @@ imx6_mux_enable_gpio(mux_sys_t* mux_sys, int gpio_id)
+         reg = &m->iomuxc->sw_mux_ctl_pad_nand_data07;
+         break;
+ 
++    case GPIOID(GPIO_BANK6, 17):
++        reg = &m->iomuxc->sw_pad_ctl_pad_sd3_data7;
++        break;
++
+     default:
+         DMUX("Unable to mux GPIOID 0x%x\n", gpio_id);
+         return -1;

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+git submodule update --init
+
+pushd projects/util_libs/
+echo "Patching util_libs"
+git apply ../../patches/util_libs.patch
+popd
+
+exit 0
