@@ -25,6 +25,7 @@
 #include <sel4utils/page_dma.h>
 #include <sel4debug/debug.h>
 #include <platsupport/io.h>
+#include <platsupport/delay.h>
 #include <utils/io.h>
 #include <utils/zf_log.h>
 #include <sel4utils/sel4_zf_logif.h>
@@ -35,6 +36,7 @@
 #include "root_task.h"
 #include "thread.h"
 #include "time_server_module.h"
+#include "mmc_module.h"
 #include "system_module.h"
 #include "hobd_module.h"
 
@@ -44,6 +46,8 @@ static char g_mem_pool[MEM_POOL_SIZE];
 static void debug_dump_scheduler(void)
 {
 #ifdef CONFIG_DEBUG_BUILD
+    ps_mdelay(100);
+
     /* could make a debug routine to walk each core and call dump? */
     ZF_LOGD("Dumping scheduler (only core 0 TCBs will be displayed)");
     printf("\n");
@@ -67,6 +71,7 @@ int main(
 
     /* initialize modules, not all of them will wait for the system module to start */
     time_server_module_init(&env);
+    mmc_module_init(&env);
     hobd_module_init(&env);
     system_module_init(&env);
 

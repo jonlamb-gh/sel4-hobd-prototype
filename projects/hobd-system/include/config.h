@@ -6,12 +6,17 @@
  * - EP_BADGE = arbitrary (but unique) number for a badge
  * - AFFINITY - CPU core to run on
  *
+ *   TODO:
+ *   - add thread priority
+ *   - use CMake configuration options
+ *
  */
-
-/* TODO - add thread priority */
 
 #ifndef CONFIG_H
 #define CONFIG_H
+
+/* TODO */
+#define SIMULATION_BUILD (1)
 
 /* TODO */
 #define DEFAULT_STACK_SIZE (512UL)
@@ -38,6 +43,11 @@
 #define HOBDMOD_THREAD_NAME "hobd-comm"
 #define HOBDMOD_THREAD_AFFINITY (0)
 #define HOBDMOD_STACK_SIZE (2 * DEFAULT_STACK_SIZE)
-#define HOBDMOD_EP_BADGE (0x21)
+#define HOBDMOD_EP_BADGE (0x22)
+
+#define MMCMOD_THREAD_NAME "mmc"
+#define MMCMOD_THREAD_AFFINITY (0)
+#define MMCMOD_STACK_SIZE DEFAULT_STACK_SIZE
+#define MMCMOD_EP_BADGE (0x23)
 
 #endif /* CONFIG_H */

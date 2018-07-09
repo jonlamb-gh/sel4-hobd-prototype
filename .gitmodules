@@ -16,3 +16,6 @@
 [submodule "projects/projects_libs"]
 	path = projects/projects_libs
 	url = https://github.com/SEL4PROJ/projects_libs.git
+[submodule "projects/fat_io_lib"]
+	path = projects/fat_io_lib
+	url = https://github.com/jonlamb-gh/fat_io_lib.git
