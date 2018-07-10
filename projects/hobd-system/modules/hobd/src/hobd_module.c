@@ -22,7 +22,9 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
-#include "time_server_module.h"
+#include "time_server.h"
+#include "mmc_entry.h"
+#include "mmc.h"
 #include "system_module.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
@@ -30,13 +32,16 @@
 #include "comm.h"
 #include "hobd_module.h"
 
-/* TODO - projects/util_libs/libplatsupport/src/plat/imx6/mux.c
- * doesn't seem to support all the GPIOs */
-/* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 */
-//#define UART_TX_PORT (GPIO_BANK6)
-//#define UART_TX_PIN (17)
-#define UART_TX_PORT (GPIO_BANK1)
-#define UART_TX_PIN (1)
+#ifdef HOBDMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
+/* see 36.4 IOMUXC of TRM */
+/* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 - SW_PAD_CTL_PAD_SD3_DATA7 */
+#define UART_TX_PORT (GPIO_BANK6)
+#define UART_TX_PIN (17)
 
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
@@ -52,9 +57,18 @@ static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
 
+static void new_hobd_msg_callback(
+        const hobd_msg_s * const msg)
+{
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            (uint16_t) msg->header.size,
+            (const uint8_t*) msg);
+}
+
 static void ecu_init_seq(void)
 {
-    ZF_LOGD("Performing ECU GPIO initialization sequence");
+    MODLOGD("Performing ECU GPIO initialization sequence");
 
     /* perform the init sequence */
     comm_gpio_init_seq(&g_comm.gpio_uart_tx, &g_comm);
@@ -71,7 +85,7 @@ static void ecu_init_seq(void)
 
 static void send_ecu_diag_messages(void)
 {
-    ZF_LOGD("Sending ECU diagnostic messages");
+    MODLOGD("Sending ECU diagnostic messages");
 
     hobd_msg_s * const msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
 
@@ -131,7 +145,7 @@ static uint32_t wait_for_resp(
     {
         uint64_t resp_time;
         time_server_get_time(&resp_time);
-        ZF_LOGD("Response msg time is %llu ns", resp_time);
+        MODLOGD("Response msg time is %llu ns", resp_time);
     }
 
     return resp_found;
@@ -152,7 +166,7 @@ static void send_table_req(
     }
     else
     {
-        assert(table != table);
+        assert(false);
     }
 
     comm_send_msg(tx_msg, &g_comm);
@@ -161,7 +175,6 @@ static void send_table_req(
 static void comm_update_state(void)
 {
     /* TODO - error/non-blocking */
-
     /* TODO - better state managment, retry current state, fallback state, etc */
 
     if(g_comm.state == COMM_STATE_GPIO_INIT)
@@ -169,7 +182,7 @@ static void comm_update_state(void)
         /* perform the ECU diagnostic init sequence */
         ecu_init_seq();
         g_comm.state = COMM_STATE_SEND_ECU_INIT;
-        ZF_LOGD("->STATE_SEND_ECU_INIT");
+        MODLOGD("->STATE_SEND_ECU_INIT");
     }
     else if(g_comm.state == COMM_STATE_SEND_ECU_INIT)
     {
@@ -182,12 +195,12 @@ static void comm_update_state(void)
         if(msg_found == 1)
         {
             g_comm.state = COMM_STATE_SEND_REQ0;
-            ZF_LOGD("->STATE_SEND_REQ0");
+            MODLOGD("->STATE_SEND_REQ0");
         }
         else
         {
             g_comm.state = COMM_STATE_GPIO_INIT;
-            ZF_LOGD("<-STATE_GPIO_INIT");
+            MODLOGD("<-STATE_GPIO_INIT");
         }
     }
     else if(g_comm.state == COMM_STATE_SEND_REQ0)
@@ -198,14 +211,15 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
-            /* TODO - callback/signal */
+            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+
             g_comm.state = COMM_STATE_SEND_REQ1;
-            ZF_LOGD("->STATE_SEND_REQ1");
+            MODLOGD("->STATE_SEND_REQ1");
         }
         else
         {
             g_comm.state = COMM_STATE_SEND_ECU_INIT;
-            ZF_LOGD("<-STATE_SEND_ECU_INIT");
+            MODLOGD("<-STATE_SEND_ECU_INIT");
         }
     }
     else if(g_comm.state == COMM_STATE_SEND_REQ1)
@@ -216,19 +230,20 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
-            /* TODO - callback/signal */
+            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+
             g_comm.state = COMM_STATE_SEND_REQ0;
-            ZF_LOGD("->STATE_SEND_REQ0");
+            MODLOGD("->STATE_SEND_REQ0");
         }
         else
         {
             g_comm.state = COMM_STATE_SEND_ECU_INIT;
-            ZF_LOGD("<-STATE_SEND_ECU_INIT");
+            MODLOGD("<-STATE_SEND_ECU_INIT");
         }
     }
 }
 
-static void obd_comm_thread_fn(void)
+static void obd_comm_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -254,11 +269,10 @@ static void obd_comm_thread_fn(void)
             &g_comm.gpio_uart_tx);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin");
 
-    ZF_LOGD(HOBDMOD_THREAD_NAME " thread is running");
+    MODLOGD(HOBDMOD_THREAD_NAME " thread is running");
 
     g_comm.state = COMM_STATE_GPIO_INIT;
 
-    /* TODO - handle bad data/comms/etc */
     while(1)
     {
         comm_update_state();
@@ -318,7 +332,7 @@ void hobd_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(HOBDMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", HOBDMOD_THREAD_NAME);
+    MODLOGD("%s is initialized", HOBDMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);

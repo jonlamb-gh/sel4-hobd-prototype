@@ -18,6 +18,12 @@
 #include "thread.h"
 #include "system_module.h"
 
+#ifdef SYSMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
 static thread_s g_thread;
 static uint64_t g_thread_stack[SYSMOD_STACK_SIZE];
 static sync_mutex_t g_sys_ready_mutex;
@@ -28,10 +34,10 @@ static void signal_ready_to_start(void)
     const int err = sync_mutex_unlock(&g_sys_ready_mutex);
     ZF_LOGF_IF(err != 0, "Failed to signal system ready to start - failed to unlock mutex");
 
-    ZF_LOGD("System starting");
+    MODLOGD("System starting");
 }
 
-static void thread_fn(void)
+static void sys_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -41,7 +47,7 @@ static void thread_fn(void)
         err = sync_mutex_lock(&g_sys_ready_mutex);
         ZF_LOGF_IF(err != 0, "Failed to lock mutex");
 
-        ZF_LOGD("System ready to start");
+        MODLOGD("System ready to start");
 
         g_is_init = 1;
     }
@@ -75,7 +81,7 @@ void system_module_init(
             SYSMOD_EP_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
-            &thread_fn,
+            &sys_thread_fn,
             env,
             &g_thread);
 
@@ -83,7 +89,7 @@ void system_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(SYSMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", SYSMOD_THREAD_NAME);
+    MODLOGD("%s is initialized", SYSMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);

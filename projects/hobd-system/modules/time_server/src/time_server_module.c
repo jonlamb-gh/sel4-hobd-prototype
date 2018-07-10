@@ -11,6 +11,7 @@
 #include <sel4/sel4.h>
 #include <sel4debug/debug.h>
 #include <sel4platsupport/timer.h>
+#include <sync/mutex.h>
 #include <allocman/vka.h>
 #include <platsupport/delay.h>
 #include <platsupport/ltimer.h>
@@ -21,9 +22,16 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "time_server.h"
 #include "time_server_module.h"
 
-#define MAX_TIMEOUTS (1)
+#ifdef TMSERVERMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
+#define MAX_TIMEOUTS (2)
 
 /* TODO - which things should be in the init_env? */
 
@@ -31,28 +39,43 @@
 static vka_object_t g_timer_ntfn;
 static seL4_timer_t g_timer;
 static time_manager_t g_tm;
+static sync_mutex_t g_tm_mutex;
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[TMSERVERMOD_STACK_SIZE];
 
-static void time_server_thread_fn(void)
+static void tm_lock(void)
+{
+    const int err = sync_mutex_lock(&g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to lock tm mutex");
+}
+
+static void tm_unlock(void)
+{
+    const int err = sync_mutex_unlock(&g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to unlock tm mutex");
+}
+
+static void time_server_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 
-    ZF_LOGD(TMSERVERMOD_THREAD_NAME " thread is running");
+    MODLOGD(TMSERVERMOD_THREAD_NAME " thread is running");
 
     while(1)
     {
-        /* TODO */
-
         /* wait on the IRQ notification */
         seL4_Word mbadge = 0;
         seL4_Wait(g_timer_ntfn.cptr, &mbadge);
 
         sel4platsupport_handle_timer_irq(&g_timer, mbadge);
 
+        tm_lock();
+
         err = tm_update(&g_tm);
         ZF_LOGF_IF(err != 0, "Failed to update time manager");
+
+        tm_unlock();
     }
 
     /* should not get here, intentional halt */
@@ -96,7 +119,7 @@ static void init_tm(
     err = tm_get_time(&g_tm, &init_time);
     ZF_LOGF_IF(err != 0, "Failed to get time");
 
-    ZF_LOGD("Created timer - current time is %llu ns", init_time);
+    MODLOGD("Created timer - current time is %llu ns", init_time);
 }
 
 void time_server_module_init(
@@ -105,6 +128,12 @@ void time_server_module_init(
     int err;
 
     init_timer(env);
+
+    /* create time manager mutex */
+    err = sync_mutex_new(&env->vka, &g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to create new mutex");
+
+    tm_lock();
 
     /* create a worker thread */
     thread_create(
@@ -129,18 +158,23 @@ void time_server_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(TMSERVERMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", TMSERVERMOD_THREAD_NAME);
+    MODLOGD("%s is initialized", TMSERVERMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);
+
+    tm_unlock();
 }
 
 void time_server_get_time(
         uint64_t * const time)
 {
-    /* TODO init/sanity checks */
+    tm_lock();
+
     const int err = tm_get_time(&g_tm, time);
     ZF_LOGF_IF(err != 0, "Failed to get time");
+
+    tm_unlock();
 }
 
 void time_server_alloc_id(
@@ -148,8 +182,12 @@ void time_server_alloc_id(
 {
     unsigned int tm_id = 0;
 
+    tm_lock();
+
     const int err = tm_alloc_id(&g_tm, &tm_id);
     ZF_LOGF_IF(err != 0, "Failed to allocate time manager ID");
+
+    tm_unlock();
 
     if(err == 0)
     {
@@ -161,9 +199,11 @@ void time_server_register_periodic_cb(
         const uint64_t period,
         const uint64_t start,
         const uint32_t id,
-        const time_server_timeout_cb_fn_t const callback,
+        const time_server_timeout_cb_fn_t callback,
         uintptr_t token)
 {
+    tm_lock();
+
     const int err = tm_register_periodic_cb(
             &g_tm,
             period,
@@ -175,14 +215,18 @@ void time_server_register_periodic_cb(
             err != 0,
             "Failed to register periodic timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }
 
 void time_server_register_rel_cb(
         const uint64_t time,
         const uint32_t id,
-        const time_server_timeout_cb_fn_t const callback,
+        const time_server_timeout_cb_fn_t callback,
         uintptr_t token)
 {
+    tm_lock();
+
     const int err = tm_register_rel_cb(
             &g_tm,
             time,
@@ -193,14 +237,20 @@ void time_server_register_rel_cb(
             err != 0,
             "Failed to register relative timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }
 
 void time_server_deregister_cb(
         const uint32_t id)
 {
+    tm_lock();
+
     const int err = tm_deregister_cb(&g_tm, (unsigned int) id);
     ZF_LOGF_IF(
             err != 0,
             "Failed to deregister timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }

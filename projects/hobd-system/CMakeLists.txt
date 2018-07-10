@@ -18,6 +18,7 @@ ApplyData61ElfLoaderSettings()
 add_executable(
     hobd-system
     modules/time_server/src/time_server_module.c
+    modules/mmc/src/mmc_module.c
     modules/hobd/src/hobd_parser.c
     modules/hobd/src/comm.c
     modules/hobd/src/hobd_module.c
@@ -53,10 +54,16 @@ target_compile_options(
     -Wno-unused-result
     -Werror)
 
+target_compile_definitions(
+    hobd-system
+    PRIVATE
+    FATFS_USE_CUSTOM_OPTS_FILE)
+
 target_include_directories(
     hobd-system
     PRIVATE
     modules/time_server/include
+    modules/mmc/include
     modules/hobd/include
     modules/system/include
     include)
@@ -77,7 +84,9 @@ target_link_libraries(
     platsupport
     utils
     cpio
-    elf)
+    elf
+    sdhcdrivers
+    fatio)
 
 DeclareRootserver(hobd-system)
 

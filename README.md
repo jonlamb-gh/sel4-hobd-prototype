@@ -9,6 +9,7 @@ See the `devel` branch for the most recent developments.
 - Add cmake configs for simulation features
 - Remove hard-coded debug configs
 - Add MUX support for the `UART1_TX_DATA` GPIO
+- Why is `dcache flush; dcache off` in U-boot needed?
 
 ## Links
 
@@ -26,6 +27,8 @@ See the `devel` branch for the most recent developments.
 ## Building
 
 ```bash
+./scripts/apply-patches
+
 ./scripts/build
 ```
 
@@ -88,6 +91,14 @@ echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 ```
 
 ## Output
+
+Example U-boot command:
+
+```bash
+setenv bootsel4 'tftp ${loadaddr} ${serverip}:${imgname}; dcache flush; dcache off; bootelf'
+
+run bootsel4
+```
 
 ```bash
 ELF-loader started on CPU: ARM Ltd. Cortex-A9 r0p0
