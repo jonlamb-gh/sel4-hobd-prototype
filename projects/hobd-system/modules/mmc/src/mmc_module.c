@@ -65,13 +65,13 @@ static seL4_Word align_up(
 static void fatio_lock(void)
 {
     const int err = sync_recursive_mutex_lock(&g_fs_mutex);
-    ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to lock filesystem mutex");
+    ZF_LOGF_IF(err != 0, "Failed to lock filesystem mutex");
 }
 
 static void fatio_unlock(void)
 {
     const int err = sync_recursive_mutex_unlock(&g_fs_mutex);
-    ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to unlock filesystem mutex");
+    ZF_LOGF_IF(err != 0, "Failed to unlock filesystem mutex");
 }
 
 /* FAT IO media API */

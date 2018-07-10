@@ -11,6 +11,7 @@
 #include <sel4/sel4.h>
 #include <sel4debug/debug.h>
 #include <sel4platsupport/timer.h>
+#include <sync/mutex.h>
 #include <allocman/vka.h>
 #include <platsupport/delay.h>
 #include <platsupport/ltimer.h>
@@ -38,9 +39,22 @@
 static vka_object_t g_timer_ntfn;
 static seL4_timer_t g_timer;
 static time_manager_t g_tm;
+static sync_mutex_t g_tm_mutex;
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[TMSERVERMOD_STACK_SIZE];
+
+static void tm_lock(void)
+{
+    const int err = sync_mutex_lock(&g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to lock tm mutex");
+}
+
+static void tm_unlock(void)
+{
+    const int err = sync_mutex_unlock(&g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to unlock tm mutex");
+}
 
 static void time_server_thread_fn(const seL4_CPtr ep_cap)
 {
@@ -50,16 +64,18 @@ static void time_server_thread_fn(const seL4_CPtr ep_cap)
 
     while(1)
     {
-        /* TODO */
-
         /* wait on the IRQ notification */
         seL4_Word mbadge = 0;
         seL4_Wait(g_timer_ntfn.cptr, &mbadge);
 
         sel4platsupport_handle_timer_irq(&g_timer, mbadge);
 
+        tm_lock();
+
         err = tm_update(&g_tm);
         ZF_LOGF_IF(err != 0, "Failed to update time manager");
+
+        tm_unlock();
     }
 
     /* should not get here, intentional halt */
@@ -113,6 +129,12 @@ void time_server_module_init(
 
     init_timer(env);
 
+    /* create time manager mutex */
+    err = sync_mutex_new(&env->vka, &g_tm_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to create new mutex");
+
+    tm_lock();
+
     /* create a worker thread */
     thread_create(
             TMSERVERMOD_THREAD_NAME,
@@ -140,14 +162,19 @@ void time_server_module_init(
 
     /* start the new thread */
     thread_start(&g_thread);
+
+    tm_unlock();
 }
 
 void time_server_get_time(
         uint64_t * const time)
 {
-    /* TODO init/sanity checks */
+    tm_lock();
+
     const int err = tm_get_time(&g_tm, time);
     ZF_LOGF_IF(err != 0, "Failed to get time");
+
+    tm_unlock();
 }
 
 void time_server_alloc_id(
@@ -155,8 +182,12 @@ void time_server_alloc_id(
 {
     unsigned int tm_id = 0;
 
+    tm_lock();
+
     const int err = tm_alloc_id(&g_tm, &tm_id);
     ZF_LOGF_IF(err != 0, "Failed to allocate time manager ID");
+
+    tm_unlock();
 
     if(err == 0)
     {
@@ -171,6 +202,8 @@ void time_server_register_periodic_cb(
         const time_server_timeout_cb_fn_t callback,
         uintptr_t token)
 {
+    tm_lock();
+
     const int err = tm_register_periodic_cb(
             &g_tm,
             period,
@@ -182,6 +215,8 @@ void time_server_register_periodic_cb(
             err != 0,
             "Failed to register periodic timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }
 
 void time_server_register_rel_cb(
@@ -190,6 +225,8 @@ void time_server_register_rel_cb(
         const time_server_timeout_cb_fn_t callback,
         uintptr_t token)
 {
+    tm_lock();
+
     const int err = tm_register_rel_cb(
             &g_tm,
             time,
@@ -200,14 +237,20 @@ void time_server_register_rel_cb(
             err != 0,
             "Failed to register relative timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }
 
 void time_server_deregister_cb(
         const uint32_t id)
 {
+    tm_lock();
+
     const int err = tm_deregister_cb(&g_tm, (unsigned int) id);
     ZF_LOGF_IF(
             err != 0,
             "Failed to deregister timeout callback with ID = 0x%lX",
             (unsigned long) id);
+
+    tm_unlock();
 }
