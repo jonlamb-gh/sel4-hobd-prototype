@@ -180,7 +180,6 @@ void comm_fill_msg_subgroub_d1_query(
     query->table = HOBD_TABLE_D1;
     query->offset = 0;
     query->count = 0x06;
-    //query->count = 0x80;
 
     (void) hobd_msg(
             HOBD_MSG_TYPE_QUERY,

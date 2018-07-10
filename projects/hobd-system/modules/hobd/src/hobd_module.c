@@ -23,6 +23,7 @@
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
+#include "mmc_entry.h"
 #include "mmc.h"
 #include "system_module.h"
 #include "hobd_kline.h"
@@ -49,6 +50,15 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
+
+static void new_hobd_msg_callback(
+        const hobd_msg_s * const msg)
+{
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            (uint16_t) msg->header.size,
+            (const uint8_t*) msg);
+}
 
 static void ecu_init_seq(void)
 {
@@ -196,7 +206,8 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
-            /* TODO - callback/signal */
+            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+
             g_comm.state = COMM_STATE_SEND_REQ1;
             ZF_LOGD("->STATE_SEND_REQ1");
         }
@@ -214,7 +225,8 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
-            /* TODO - callback/signal */
+            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+
             g_comm.state = COMM_STATE_SEND_REQ0;
             ZF_LOGD("->STATE_SEND_REQ0");
         }

@@ -21,6 +21,7 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "mmc_entry.h"
 #include "mmc.h"
 #include "mmc_module.h"
 
@@ -30,8 +31,20 @@
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
 
+static seL4_Word g_msg_rx_buffer[seL4_MsgMaxLength];
+
 static thread_s g_thread;
 static uint64_t g_thread_stack[MMCMOD_STACK_SIZE];
+
+static const char FILE_NAME[] = "/hobd.log";
+
+/* Align 'n' up to the value 'align', which must be a power of two. */
+static seL4_Word align_up(
+        const seL4_Word n,
+        const seL4_Word align)
+{
+    return (n + align - 1) & (~(align - 1));
+}
 
 /* FAT IO media API */
 #ifndef SIMULATION_BUILD
@@ -87,13 +100,13 @@ static int fatio_media_write(
 
 static void mmc_thread_fn(const seL4_CPtr ep_cap)
 {
-    int err;
     seL4_Word badge;
 
     /* initialize FAT IO library */
     fl_init();
 
 #ifndef SIMULATION_BUILD
+    int err;
     const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
     ZF_LOGD("MMC card capacity = %llu bytes", card_cap);
 
@@ -107,29 +120,37 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
     while(1)
     {
         /* TODO - handle incoming IPC/messages to be logged to the MMC card */
-        (void) err;
+        /* TODO - keep file handle open, flush on a timeout? */
 
         const seL4_MessageInfo_t info = seL4_Recv(
                 ep_cap,
                 &badge);
 
-        (void) info;
+        ZF_LOGF_IF(badge != (MMCMOD_EP_BADGE + 1), "Invalid IPC badge");
 
-        ZF_LOGD(
-                "mmc IPC msg badge = 0x%X - label = 0x%X - length = %u",
-                badge,
-                seL4_MessageInfo_get_label(info),
-                seL4_MessageInfo_get_length(info));
+        const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
 
-        /*
-        FL_FILE * const file = fl_fopen("/file.txt", "wa");
+        /* reuse badge as index , this is probably unnecessary */
+        for(badge = 0; badge < total_size_words; badge += 1)
+        {
+            g_msg_rx_buffer[badge] = seL4_GetMR(badge);
+        }
+
+        const mmc_entry_s * const entry =
+                (const mmc_entry_s*) &g_msg_rx_buffer[0];
+
+        ZF_LOGF_IF(entry->type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
+        ZF_LOGF_IF(entry->size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+
+#ifndef SIMULATION_BUILD
+        FL_FILE * const file = fl_fopen(FILE_NAME, "wba");
 
         if(file != NULL)
         {
-            const char str[] = "hello\n";
+            const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
 
-            err = fl_fputs(str, file);
-            ZF_LOGF_IF(err != (sizeof(str) - 1), "Failed to write to MMC card");
+            err = fl_fwrite((void*) entry, 1, entry_size_bytes, file);
+            ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write to MMC card");
 
             fl_fclose(file);
         }
@@ -137,8 +158,7 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
         {
             ZF_LOGW("failed to open MMC card file");
         }
-        ps_sdelay(1);
-        */
+#endif
     }
 
     /* cleanup and release FAT IO library */
@@ -196,7 +216,46 @@ void mmc_module_init(
     thread_start(&g_thread);
 }
 
-seL4_CPtr mmc_get_ipc_cap(void)
+/* TODO */
+void mmc_log_entry_data(
+        const uint16_t type,
+        const uint16_t data_size,
+        const uint8_t * const data)
 {
-    return g_thread.ipc_ep_cap;
+    const seL4_Word size_bytes = (seL4_Word) (data_size + MMC_ENTRY_HEADER_SIZE);
+    const seL4_Word total_size_bytes = align_up(size_bytes, 4);
+    const seL4_Word total_size_words = (seL4_Word) (total_size_bytes / sizeof(seL4_Word));
+
+    ZF_LOGF_IF((total_size_bytes % 4) != 0, "Invalid MMC entry data alignment");
+
+    ZF_LOGF_IF(
+            total_size_bytes > MMC_ENTRY_DATA_SIZE_MAX,
+            "Failed to log MMC entry data - data size too large");
+
+    const seL4_MessageInfo_t info =
+            seL4_MessageInfo_new((seL4_Uint32) type, 0, 0, total_size_words);
+
+    /* header in R0 */
+    seL4_SetMR(0, (seL4_Word) (type | (data_size << 16)));
+
+    uint32_t idx;
+    for(idx = 0; idx < (total_size_words - 1); idx += 1)
+    {
+        seL4_Word data_word = 0;
+
+        uint32_t shift;
+        for(shift = 0; shift < 4; shift += 1)
+        {
+            const uint32_t data_index = (idx * 4) + shift;
+
+            if(data_index < (uint32_t) data_size)
+            {
+                data_word |= (data[data_index] << shift);
+            }
+        }
+
+        seL4_SetMR(1 + idx, data_word);
+    }
+
+    seL4_Send(g_thread.ipc_ep_cap, info);
 }

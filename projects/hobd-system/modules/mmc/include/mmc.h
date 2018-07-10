@@ -11,10 +11,16 @@
 
 #include <sel4/bootinfo_types.h>
 
-/* TODO - mmc_protocol.h */
+#include "mmc_entry.h"
 
 /* TODO - not thread safe */
 
-seL4_CPtr mmc_get_ipc_cap(void);
+/* not to be called by MMC thread */
+/* length in bytes */
+//void mmc_log_entry(const ... entry);
+void mmc_log_entry_data(
+        const uint16_t type,
+        const uint16_t data_size,
+        const uint8_t * const data);
 
 #endif /* MMC_H */
