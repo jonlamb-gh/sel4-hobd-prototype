@@ -63,6 +63,7 @@ static void new_hobd_msg_callback(
     mmc_log_entry_data(
             MMC_ENTRY_TYPE_HOBD_MSG,
             (uint16_t) msg->header.size,
+            NULL,
             (const uint8_t*) msg);
 }
 

@@ -2,13 +2,20 @@
 
 Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
 
+Manages a diagnostic connection to the Honda CBR ECU and logs data to an SD card.
+
+Supported platforms:
+
+- Sabre Lite IMx6, quad core A9
+
 See the `devel` branch for the most recent developments.
 
 ## TODO
 
+- Add to this doc/other-docs/diagrams/etc
+- Cleanup repo, remove old milestone tags
 - Add cmake configs for simulation features
 - Remove hard-coded debug configs
-- Add MUX support for the `UART1_TX_DATA` GPIO
 - Why is `dcache flush; dcache off` in U-boot needed?
 
 ## Links
@@ -26,6 +33,8 @@ See the `devel` branch for the most recent developments.
 
 ## Building
 
+TODO - `SIMULATION_BUILD`
+
 ```bash
 ./scripts/apply-patches
 
@@ -34,13 +43,12 @@ See the `devel` branch for the most recent developments.
 
 ## SMP / Multicore
 
-By default, only a single node/core is used, because the simulate script logic
-does automatically add smp options yet.
+By default, 4 cores are enabled to match my hardware.
 
-CMake config `KernelMaxNumNodes` is in `configs/imx6_sabre_lite.cmake`.
+See CMake config `KernelMaxNumNodes` is in `configs/imx6_sabre_lite.cmake`.
 
-Add this to the generated `simulate` script if
-simulating (note that it must be >= `KernelMaxNumNodes`):
+My project sets the QEMU option `QemuFlags` to add the
+following (note that it must be >= `KernelMaxNumNodes`):
 
 ```base
 -smp cores=4

@@ -149,7 +149,7 @@ static void write_mmc_entry(
 #ifndef SIMULATION_BUILD
     ZF_LOGF_IF(g_file_handle == NULL, "MMC file handle is invalid");
 
-    const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
+    const uint16_t entry_size_bytes = mmc_entry_total_size(entry);
 
     int err = fl_fwrite((void*) entry, 1, entry_size_bytes, g_file_handle);
     ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC");
@@ -177,6 +177,7 @@ static int hard_flush_timeout_cb(
 
 static void mmc_thread_fn(const seL4_CPtr ep_cap)
 {
+    uint64_t timestamp;
     seL4_Word badge;
 
     /* initialize FAT IO library */
@@ -210,10 +211,16 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
 
     MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
+    time_server_get_time(&timestamp);
+
     const mmc_entry_s begin_entry_marker =
     {
-        .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
-        .size = 0
+        .header =
+        {
+            .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
+            .size = 0,
+            .timestamp = timestamp,
+        }
     };
 
     /* write the begin of log marker */
@@ -239,8 +246,8 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
         const mmc_entry_s * const entry =
                 (const mmc_entry_s*) &g_msg_rx_buffer[0];
 
-        ZF_LOGF_IF(entry->type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
-        ZF_LOGF_IF(entry->size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+        ZF_LOGF_IF(entry->header.type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
+        ZF_LOGF_IF(entry->header.size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
 
         write_mmc_entry(entry, 0);
     }
@@ -312,8 +319,21 @@ void mmc_module_init(
 void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
+        const uint64_t * const timestamp,
         const uint8_t * const data)
 {
+    uint64_t local_timestamp = 0;
+    const uint64_t *tstamp_ref = &local_timestamp;
+
+    if(timestamp != NULL)
+    {
+        tstamp_ref = timestamp;
+    }
+    else
+    {
+        time_server_get_time(&local_timestamp);
+    }
+
     const seL4_Word size_bytes = (seL4_Word) (data_size + MMC_ENTRY_HEADER_SIZE);
     const seL4_Word total_size_bytes = align_up(size_bytes, 4);
     const seL4_Word total_size_words = (seL4_Word) (total_size_bytes / sizeof(seL4_Word));
@@ -327,8 +347,10 @@ void mmc_log_entry_data(
     const seL4_MessageInfo_t info =
             seL4_MessageInfo_new((seL4_Uint32) type, 0, 0, total_size_words);
 
-    /* header in R0 */
+    /* header in R0:R2 */
     seL4_SetMR(0, (seL4_Word) (type | (data_size << 16)));
+    seL4_SetMR(1, (seL4_Word) ((*tstamp_ref) & 0xFFFFFFFF));
+    seL4_SetMR(2, (seL4_Word) (((*tstamp_ref) >> 32) & 0xFFFFFFFF));
 
     uint32_t idx;
     for(idx = 0; idx < (total_size_words - 1); idx += 1)
@@ -346,7 +368,7 @@ void mmc_log_entry_data(
             }
         }
 
-        seL4_SetMR(1 + idx, data_word);
+        seL4_SetMR(3 + idx, data_word);
     }
 
     seL4_Send(g_thread.ipc_ep_cap, info);

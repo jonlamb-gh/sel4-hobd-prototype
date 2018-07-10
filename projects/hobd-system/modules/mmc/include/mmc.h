@@ -13,15 +13,17 @@
 
 #include "mmc_entry.h"
 
-/* TODO - not thread safe */
+/* TODO
+void mmc_log_entry(
+        const mmc_entry_s * const entry);
+*/
 
 /* not to be called by the MMC thread */
-
 /* length in bytes */
-//void mmc_log_entry(const ... entry);
 void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
+        const uint64_t * const timestamp,
         const uint8_t * const data);
 
 #endif /* MMC_H */

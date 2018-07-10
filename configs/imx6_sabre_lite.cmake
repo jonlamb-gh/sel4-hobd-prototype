@@ -16,7 +16,7 @@ set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(LibUtilsDefaultZfLogLevel "0" CACHE STRING "" FORCE)
 set(LibSel4PlatSupportUseDebugPutChar true CACHE BOOL "")
 
-set(KernelMaxNumNodes "1" CACHE STRING "")
+set(KernelMaxNumNodes "4" CACHE STRING "")
 set(KernelNumDomains 1 CACHE STRING "")
 set(KernelMaxNumBootinfoUntypedCap 200 CACHE STRING "")
 set(KernelRetypeFanOutLimit "256" CACHE STRING "")

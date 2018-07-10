@@ -11,6 +11,9 @@ config_option(
     DEFAULT ON
 )
 
+# enable all 4 cores in QEMU
+set(QemuFlags "-smp cores=4")
+
 ApplyCommonSimulationSettings()
 
 ApplyData61ElfLoaderSettings()
