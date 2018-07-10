@@ -12,6 +12,7 @@
 #include <sel4debug/debug.h>
 #include <allocman/vka.h>
 #include <platsupport/delay.h>
+#include <sync/recursive_mutex.h>
 #include <sel4utils/sel4_zf_logif.h>
 #include <sdhc/sdio.h>
 #include <sdhc/mmc.h>
@@ -31,6 +32,9 @@
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
 
+static FL_FILE *g_file_handle;
+static sync_recursive_mutex_t g_fs_mutex;
+
 static seL4_Word g_msg_rx_buffer[seL4_MsgMaxLength];
 
 static thread_s g_thread;
@@ -46,8 +50,21 @@ static seL4_Word align_up(
     return (n + align - 1) & (~(align - 1));
 }
 
-/* FAT IO media API */
 #ifndef SIMULATION_BUILD
+/* FAT IO media API */
+static void fatio_lock(void)
+{
+    const int err = sync_recursive_mutex_lock(&g_fs_mutex);
+    ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to lock filesystem mutex");
+}
+
+static void fatio_unlock(void)
+{
+    const int err = sync_recursive_mutex_unlock(&g_fs_mutex);
+    ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to unlock filesystem mutex");
+}
+
+/* FAT IO media API */
 static int fatio_media_read(
         unsigned long sector,
         unsigned char *buffer,
@@ -98,6 +115,26 @@ static int fatio_media_write(
 }
 #endif
 
+static void write_mmc_entry(
+        const mmc_entry_s * const entry,
+        const uint32_t flush)
+{
+#ifndef SIMULATION_BUILD
+    ZF_LOGF_IF(g_file_handle == NULL, "MMC file handle is invalid");
+
+    const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
+
+    int err = fl_fwrite((void*) entry, 1, entry_size_bytes, g_file_handle);
+    ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC card");
+
+    if(flush != 0)
+    {
+        err = fl_fflush(g_file_handle);
+        ZF_LOGF_IF(err != 0, "Failed to flush MMC card IO");
+    }
+#endif
+}
+
 static void mmc_thread_fn(const seL4_CPtr ep_cap)
 {
     seL4_Word badge;
@@ -110,12 +147,28 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
     const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
     ZF_LOGD("MMC card capacity = %llu bytes", card_cap);
 
+    /* attach filesystem mutex functions */
+    fl_attach_locks(&fatio_lock, &fatio_unlock);
+
     /* attach media access functions */
     err = fl_attach_media(&fatio_media_read, &fatio_media_write);
     ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to attach FAT IO media access functions");
+
+    /* open file */
+    g_file_handle = fl_fopen(FILE_NAME, "wba");
+    ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
 #endif
 
-    ZF_LOGD(MMCMOD_THREAD_NAME " thread is running - ep_cap = 0x%X", ep_cap);
+    ZF_LOGD(MMCMOD_THREAD_NAME " thread is running");
+
+    const mmc_entry_s begin_entry_marker =
+    {
+        .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
+        .size = 0
+    };
+
+    /* write the begin of log marker */
+    write_mmc_entry(&begin_entry_marker, 1);
 
     while(1)
     {
@@ -142,23 +195,12 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
         ZF_LOGF_IF(entry->type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
         ZF_LOGF_IF(entry->size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
 
-#ifndef SIMULATION_BUILD
-        FL_FILE * const file = fl_fopen(FILE_NAME, "wba");
+        write_mmc_entry(entry, 0);
+    }
 
-        if(file != NULL)
-        {
-            const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
-
-            err = fl_fwrite((void*) entry, 1, entry_size_bytes, file);
-            ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write to MMC card");
-
-            fl_fclose(file);
-        }
-        else
-        {
-            ZF_LOGW("failed to open MMC card file");
-        }
-#endif
+    if(g_file_handle != NULL)
+    {
+        fl_fclose(g_file_handle);
     }
 
     /* cleanup and release FAT IO library */
@@ -195,6 +237,10 @@ void mmc_module_init(
     ZF_LOGF_IF(
             FAT_SECTOR_SIZE != mmc_block_size(g_mmc_card),
             "MMC block size does not match FAT sector size");
+
+    /* create a recursive mutex for the FAT IO filesystem, used to flush from another thread */
+    const int err = sync_recursive_mutex_new(&env->vka, &g_fs_mutex);
+    ZF_LOGF_IF(err != 0, "Failed to MMC filesystem mutex");
 
     /* create a worker thread */
     thread_create(

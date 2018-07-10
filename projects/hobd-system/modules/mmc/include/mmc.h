@@ -15,7 +15,8 @@
 
 /* TODO - not thread safe */
 
-/* not to be called by MMC thread */
+/* not to be called by the MMC thread */
+
 /* length in bytes */
 //void mmc_log_entry(const ... entry);
 void mmc_log_entry_data(
