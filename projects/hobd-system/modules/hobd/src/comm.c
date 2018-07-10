@@ -18,7 +18,7 @@
 #include <sel4debug/debug.h>
 
 #include "config.h"
-#include "time_server_module.h"
+#include "time_server.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
 #include "hobd_msg.h"

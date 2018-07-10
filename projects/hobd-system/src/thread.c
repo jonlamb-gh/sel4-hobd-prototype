@@ -59,14 +59,36 @@ void thread_create(
     /* points to itself for now, could be a better wrapper structure */
     ipc_buffer->userData = (seL4_Word) ipc_buffer;
 
+    /* create a IPC endpoint */
+    err = vka_alloc_endpoint(
+            &env->vka,
+            &thread->ipc_ep);
+    ZF_LOGF_IF(err != 0, "Failed to create IPC endpoint");
+
+    /* allocate a cspace slot for the IPC endpoint */
+    err = vka_cspace_alloc(
+            &env->vka,
+            &thread->ipc_ep_cap);
+    ZF_LOGF_IF(err != 0, "Failed to allocate thread IPC endpoint");
+
+    /* create a badged IPC endpoint for the thread */
+    err = seL4_CNode_Mint(
+            cspace_cap,
+            thread->ipc_ep_cap,
+            seL4_WordBits,
+            seL4_CapInitThreadCNode,
+            thread->ipc_ep.cptr,
+            seL4_WordBits,
+            seL4_AllRights,
+            ipc_badge + 1);
+    ZF_LOGF_IF(err != 0, "Failed to mint badged IPC endpoint for thread");
+
     /* allocate a cspace slot for the fault endpoint */
     seL4_CPtr fault_ep = 0;
     err = vka_cspace_alloc(
             &env->vka,
             &fault_ep);
     ZF_LOGF_IF(err != 0, "Failed to allocate thread fault endpoint");
-
-    ZF_LOGD("Minting fault ep 0x%X for thread '%s'", fault_ep, name);
 
     /* create a badged fault endpoint for the thread */
     err = seL4_CNode_Mint(
@@ -78,7 +100,7 @@ void thread_create(
             seL4_WordBits,
             seL4_AllRights,
             ipc_badge);
-    ZF_LOGF_IF(err != 0, "Failed to mint badged endpoint for thread");
+    ZF_LOGF_IF(err != 0, "Failed to mint badged fault endpoint for thread");
 
     /* initialise the new TCB */
     err = seL4_TCB_Configure(
@@ -116,6 +138,9 @@ void thread_create(
 
     /* set stack pointer for the new thread */
     sel4utils_set_stack_pointer(&regs, thread_stack_top);
+
+    /* set arg0 to the thread's endpoint capability */
+    sel4utils_set_arg0(&regs, (seL4_Word) thread->ipc_ep_cap);
 
     /* write the TCB registers. */
     err = seL4_TCB_WriteRegisters(thread->tcb_object.cptr, 0, 0, regs_size, &regs);

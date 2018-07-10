@@ -22,7 +22,8 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
-#include "time_server_module.h"
+#include "time_server.h"
+#include "mmc.h"
 #include "system_module.h"
 #include "hobd_kline.h"
 #include "hobd_parser.h"
@@ -225,7 +226,7 @@ static void comm_update_state(void)
     }
 }
 
-static void obd_comm_thread_fn(void)
+static void obd_comm_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 

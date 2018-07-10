@@ -21,6 +21,7 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "time_server.h"
 #include "time_server_module.h"
 
 #define MAX_TIMEOUTS (1)
@@ -35,7 +36,7 @@ static time_manager_t g_tm;
 static thread_s g_thread;
 static uint64_t g_thread_stack[TMSERVERMOD_STACK_SIZE];
 
-static void time_server_thread_fn(void)
+static void time_server_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 

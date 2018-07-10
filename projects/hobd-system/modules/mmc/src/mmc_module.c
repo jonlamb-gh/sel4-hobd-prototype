@@ -21,6 +21,7 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "mmc.h"
 #include "mmc_module.h"
 
 #define FATIO_MEDIA_RW_FAILURE (0)
@@ -50,7 +51,7 @@ static int fatio_media_read(
             NULL,
             NULL);
 
-    if(bytes_read != ((long) sector_count * 512))
+    if(bytes_read != ((long) sector_count * FAT_SECTOR_SIZE))
     {
         ret = FATIO_MEDIA_RW_FAILURE;
     }
@@ -75,7 +76,7 @@ static int fatio_media_write(
             NULL,
             NULL);
 
-    if(bytes_written != ((long) sector_count * 512))
+    if(bytes_written != ((long) sector_count * FAT_SECTOR_SIZE))
     {
         ret = FATIO_MEDIA_RW_FAILURE;
     }
@@ -84,9 +85,10 @@ static int fatio_media_write(
 }
 #endif
 
-static void mmc_thread_fn(void)
+static void mmc_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
+    seL4_Word badge;
 
     /* initialize FAT IO library */
     fl_init();
@@ -100,12 +102,24 @@ static void mmc_thread_fn(void)
     ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to attach FAT IO media access functions");
 #endif
 
-    ZF_LOGD(MMCMOD_THREAD_NAME " thread is running");
+    ZF_LOGD(MMCMOD_THREAD_NAME " thread is running - ep_cap = 0x%X", ep_cap);
 
     while(1)
     {
         /* TODO - handle incoming IPC/messages to be logged to the MMC card */
         (void) err;
+
+        const seL4_MessageInfo_t info = seL4_Recv(
+                ep_cap,
+                &badge);
+
+        (void) info;
+
+        ZF_LOGD(
+                "mmc IPC msg badge = 0x%X - label = 0x%X - length = %u",
+                badge,
+                seL4_MessageInfo_get_label(info),
+                seL4_MessageInfo_get_length(info));
 
         /*
         FL_FILE * const file = fl_fopen("/file.txt", "wa");
@@ -125,8 +139,6 @@ static void mmc_thread_fn(void)
         }
         ps_sdelay(1);
         */
-
-        seL4_Yield();
     }
 
     /* cleanup and release FAT IO library */
@@ -160,6 +172,10 @@ void mmc_module_init(
     init_sdio(env);
     init_mmc(env);
 
+    ZF_LOGF_IF(
+            FAT_SECTOR_SIZE != mmc_block_size(g_mmc_card),
+            "MMC block size does not match FAT sector size");
+
     /* create a worker thread */
     thread_create(
             MMCMOD_THREAD_NAME,
@@ -178,4 +194,9 @@ void mmc_module_init(
 
     /* start the new thread */
     thread_start(&g_thread);
+}
+
+seL4_CPtr mmc_get_ipc_cap(void)
+{
+    return g_thread.ipc_ep_cap;
 }

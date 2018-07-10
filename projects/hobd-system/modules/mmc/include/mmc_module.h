@@ -14,4 +14,4 @@
 void mmc_module_init(
         init_env_s * const env);
 
-#endif /* MMC_H */
+#endif /* MMC_MODULE_H */

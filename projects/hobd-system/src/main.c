@@ -86,7 +86,9 @@ int main(
                 env.global_fault_ep,
                 &badge);
 
+        ZF_LOGD("-------------------");
         ZF_LOGD("Received fault on ep 0x%X - badge 0x%X", env.global_fault_ep, badge);
+        ZF_LOGD("-------------------");
 
         sel4utils_print_fault_message(info, "fault-handler");
 

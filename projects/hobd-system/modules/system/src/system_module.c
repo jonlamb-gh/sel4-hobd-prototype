@@ -31,7 +31,7 @@ static void signal_ready_to_start(void)
     ZF_LOGD("System starting");
 }
 
-static void thread_fn(void)
+static void sys_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -75,7 +75,7 @@ void system_module_init(
             SYSMOD_EP_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
-            &thread_fn,
+            &sys_thread_fn,
             env,
             &g_thread);
 
