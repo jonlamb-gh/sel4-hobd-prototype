@@ -24,6 +24,12 @@
 #include "hobd_msg.h"
 #include "comm.h"
 
+#ifdef HOBDMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
 static int timeout_cb(
         uintptr_t token)
 {
@@ -94,7 +100,7 @@ void comm_send_msg(
                 ((uint8_t*) msg)[idx]);
     }
 
-    ZF_LOGD(
+    MODLOGD(
             "tx_msg[%02X:%02X:%02X]",
             (unsigned int) msg->header.type,
             (unsigned int) msg->header.size,
@@ -120,7 +126,7 @@ hobd_msg_s *comm_recv_msg(
 
         if(data >= 0)
         {
-            //ZF_LOGD("got data: 0x%02X", (unsigned int) data);
+            //MODLOGD("got data: 0x%02X", (unsigned int) data);
 
             const uint8_t status = hobd_parser_parse_byte(
                     (uint8_t) data,
@@ -130,7 +136,7 @@ hobd_msg_s *comm_recv_msg(
             {
                 msg = (hobd_msg_s*) &parser->rx_buffer[0];
 
-                ZF_LOGD(
+                MODLOGD(
                     "rx_msg[%02X:%02X:%02X]",
                     (unsigned int) msg->header.type,
                     (unsigned int) msg->header.size,

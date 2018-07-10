@@ -16,7 +16,7 @@
 #define CONFIG_H
 
 /* TODO */
-#define SIMULATION_BUILD (1)
+#define SIMULATION_BUILD
 
 /* TODO */
 #define DEFAULT_STACK_SIZE (512UL)
@@ -49,5 +49,11 @@
 #define MMCMOD_THREAD_AFFINITY (0)
 #define MMCMOD_STACK_SIZE DEFAULT_STACK_SIZE
 #define MMCMOD_EP_BADGE (0x23)
+
+/* TODO - DEBUG */
+#define TMSERVERMOD_DEBUG
+#define SYSMOD_DEBUG
+#define HOBDMOD_DEBUG
+#define MMCMOD_DEBUG
 
 #endif /* CONFIG_H */

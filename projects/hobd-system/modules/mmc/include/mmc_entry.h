@@ -2,6 +2,11 @@
  * @file mmc_entry.h
  * @brief TODO.
  *
+ * TODO:
+ * - should size be total size
+ * - add fault type
+ * - where to put timestamp data
+ *
  */
 
 #ifndef MMC_ENTRY_H
@@ -16,7 +21,6 @@
 
 #define MMC_ENTRY_TYPE_INVALID (0x0000)
 #define MMC_ENTRY_TYPE_BEGIN_FLAG (0xABFE)
-#define MMC_ENTRY_TYPE_LOG_MSG (0x00A0)
 #define MMC_ENTRY_TYPE_HOBD_MSG (0x0100)
 
 /* TODO - should size be total size? */

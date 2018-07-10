@@ -14,6 +14,7 @@
 /* TODO - not thread safe yet */
 
 #define MS_TO_NS(ms) (ms * NS_IN_MS)
+#define S_TO_NS(s) (MS_TO_NS(s * MS_IN_S))
 
 /* function to call when a timeout comes in */
 typedef int (*time_server_timeout_cb_fn_t)(uintptr_t token);

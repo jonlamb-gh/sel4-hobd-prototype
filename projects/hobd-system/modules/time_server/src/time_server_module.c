@@ -24,7 +24,13 @@
 #include "time_server.h"
 #include "time_server_module.h"
 
-#define MAX_TIMEOUTS (1)
+#ifdef TMSERVERMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
+#define MAX_TIMEOUTS (2)
 
 /* TODO - which things should be in the init_env? */
 
@@ -40,7 +46,7 @@ static void time_server_thread_fn(const seL4_CPtr ep_cap)
 {
     int err;
 
-    ZF_LOGD(TMSERVERMOD_THREAD_NAME " thread is running");
+    MODLOGD(TMSERVERMOD_THREAD_NAME " thread is running");
 
     while(1)
     {
@@ -97,7 +103,7 @@ static void init_tm(
     err = tm_get_time(&g_tm, &init_time);
     ZF_LOGF_IF(err != 0, "Failed to get time");
 
-    ZF_LOGD("Created timer - current time is %llu ns", init_time);
+    MODLOGD("Created timer - current time is %llu ns", init_time);
 }
 
 void time_server_module_init(
@@ -130,7 +136,7 @@ void time_server_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(TMSERVERMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", TMSERVERMOD_THREAD_NAME);
+    MODLOGD("%s is initialized", TMSERVERMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);

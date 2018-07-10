@@ -22,9 +22,18 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "time_server.h"
 #include "mmc_entry.h"
 #include "mmc.h"
 #include "mmc_module.h"
+
+#ifdef MMCMOD_DEBUG
+#define MODLOGD(...) ZF_LOGD(__VA_ARGS__)
+#else
+#define MODLOGD(...)
+#endif
+
+#define MMC_HARD_FLUSH_TIMEOUT_NS S_TO_NS(2ULL)
 
 #define FATIO_MEDIA_RW_FAILURE (0)
 #define FATIO_MEDIA_RW_SUCCESS (1)
@@ -34,6 +43,7 @@ static mmc_card_t g_mmc_card;
 
 static FL_FILE *g_file_handle;
 static sync_recursive_mutex_t g_fs_mutex;
+static uint32_t g_hard_flush_timeout_id;
 
 static seL4_Word g_msg_rx_buffer[seL4_MsgMaxLength];
 
@@ -113,11 +123,28 @@ static int fatio_media_write(
 
     return ret;
 }
+
+static void mmc_io_flush(
+        const uint32_t hard_flush)
+{
+    if(hard_flush != 0)
+    {
+        fl_fclose(g_file_handle);
+
+        g_file_handle = fl_fopen(FILE_NAME, "wba");
+        ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
+    }
+    else
+    {
+        const int err = fl_fflush(g_file_handle);
+        ZF_LOGF_IF(err != 0, "Failed to flush MMC IO");
+    }
+}
 #endif
 
 static void write_mmc_entry(
         const mmc_entry_s * const entry,
-        const uint32_t flush)
+        const uint32_t hard_flush)
 {
 #ifndef SIMULATION_BUILD
     ZF_LOGF_IF(g_file_handle == NULL, "MMC file handle is invalid");
@@ -125,14 +152,27 @@ static void write_mmc_entry(
     const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
 
     int err = fl_fwrite((void*) entry, 1, entry_size_bytes, g_file_handle);
-    ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC card");
+    ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC");
 
-    if(flush != 0)
+    if(hard_flush != 0)
     {
-        err = fl_fflush(g_file_handle);
-        ZF_LOGF_IF(err != 0, "Failed to flush MMC card IO");
+        mmc_io_flush(1);
     }
 #endif
+}
+
+static int hard_flush_timeout_cb(
+        uintptr_t token)
+{
+#ifndef SIMULATION_BUILD
+    if(g_file_handle != NULL)
+    {
+        mmc_io_flush(1);
+    }
+#endif
+
+    return 0;
+
 }
 
 static void mmc_thread_fn(const seL4_CPtr ep_cap)
@@ -145,7 +185,7 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
 #ifndef SIMULATION_BUILD
     int err;
     const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
-    ZF_LOGD("MMC card capacity = %llu bytes", card_cap);
+    MODLOGD("MMC capacity = %llu bytes", card_cap);
 
     /* attach filesystem mutex functions */
     fl_attach_locks(&fatio_lock, &fatio_unlock);
@@ -154,12 +194,21 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
     err = fl_attach_media(&fatio_media_read, &fatio_media_write);
     ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to attach FAT IO media access functions");
 
-    /* open file */
+    /* open the log file */
     g_file_handle = fl_fopen(FILE_NAME, "wba");
     ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
 #endif
 
-    ZF_LOGD(MMCMOD_THREAD_NAME " thread is running");
+    time_server_alloc_id(&g_hard_flush_timeout_id);
+
+    time_server_register_periodic_cb(
+            MMC_HARD_FLUSH_TIMEOUT_NS,
+            0,
+            g_hard_flush_timeout_id,
+            &hard_flush_timeout_cb,
+            0);
+
+    MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
     const mmc_entry_s begin_entry_marker =
     {
@@ -170,11 +219,9 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
     /* write the begin of log marker */
     write_mmc_entry(&begin_entry_marker, 1);
 
+    /* receive MMC entries via IPC endpoint, write them to the MMC FAT filesystem */
     while(1)
     {
-        /* TODO - handle incoming IPC/messages to be logged to the MMC card */
-        /* TODO - keep file handle open, flush on a timeout? */
-
         const seL4_MessageInfo_t info = seL4_Recv(
                 ep_cap,
                 &badge);
@@ -224,7 +271,7 @@ static void init_mmc(
 
 #ifndef SIMULATION_BUILD
     const int err = mmc_init(&g_sdio_dev, &env->io_ops, &g_mmc_card);
-    ZF_LOGF_IF(err != 0, "Failed to initialize MMC card");
+    ZF_LOGF_IF(err != 0, "Failed to initialize MMC");
 #endif
 }
 
@@ -238,7 +285,7 @@ void mmc_module_init(
             FAT_SECTOR_SIZE != mmc_block_size(g_mmc_card),
             "MMC block size does not match FAT sector size");
 
-    /* create a recursive mutex for the FAT IO filesystem, used to flush from another thread */
+    /* create a recursive mutex for the FAT IO filesystem */
     const int err = sync_recursive_mutex_new(&env->vka, &g_fs_mutex);
     ZF_LOGF_IF(err != 0, "Failed to MMC filesystem mutex");
 
@@ -256,13 +303,12 @@ void mmc_module_init(
     thread_set_priority(seL4_MaxPrio, &g_thread);
     thread_set_affinity(MMCMOD_THREAD_AFFINITY, &g_thread);
 
-    ZF_LOGD("%s is initialized", MMCMOD_THREAD_NAME);
+    MODLOGD("%s is initialized", MMCMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);
 }
 
-/* TODO */
 void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
