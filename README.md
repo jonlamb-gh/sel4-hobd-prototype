@@ -215,3 +215,9 @@ rx_msg[72:08:72]
 tx_msg[02:0C:72]
 ...
 ```
+
+## Diagrams
+
+### Wiring
+
+![wiring diagram](images/wiring_diagram.png)
