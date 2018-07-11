@@ -16,7 +16,6 @@
 #include "mmc_entry.h"
 #include "hobd_kline.h"
 
-
 static const char DEFAULT_FILE_NAME[] = "hobd.log";
 
 static const char * const ENTRY_TYPE_STR_TABLE[] =
