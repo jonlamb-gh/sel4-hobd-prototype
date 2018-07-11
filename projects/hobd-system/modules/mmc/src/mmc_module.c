@@ -355,8 +355,9 @@ void mmc_log_entry_data(
     seL4_SetMR(1, (seL4_Word) ((*tstamp_ref) & 0xFFFFFFFF));
     seL4_SetMR(2, (seL4_Word) (((*tstamp_ref) >> 32) & 0xFFFFFFFF));
 
+    /* -3 for header size words */
     uint32_t idx;
-    for(idx = 0; idx < (total_size_words - 1); idx += 1)
+    for(idx = 0; idx < (total_size_words - 3); idx += 1)
     {
         seL4_Word data_word = 0;
 
@@ -367,7 +368,7 @@ void mmc_log_entry_data(
 
             if(data_index < (uint32_t) data_size)
             {
-                data_word |= (data[data_index] << shift);
+                data_word |= (data[data_index] << (shift * 8));
             }
         }
 

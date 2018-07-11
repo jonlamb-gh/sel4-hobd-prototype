@@ -30,6 +30,7 @@ See the `devel` branch for the most recent developments.
 - [CMake config for this project](configs/imx6_sabre_lite.cmake)
 - [Main project root directory](projects/hobd_system)
 - [ECU data generator tool](testing_tools/fake_hobd_ecu_data/README.md)
+- [MMC entry log file dump tool](testing-tools/hobd-log-entry-dump/README.md)
 
 ## Building
 
