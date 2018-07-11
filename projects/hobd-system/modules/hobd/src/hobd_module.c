@@ -84,6 +84,13 @@ static void send_ecu_diag_messages(void)
 
     comm_send_msg(msg, &g_comm);
 
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE,
+            NULL,
+            &g_msg_tx_buffer[0]);
+
     ps_mdelay(1);
 
     /* create a diagnostic init message */
@@ -95,6 +102,13 @@ static void send_ecu_diag_messages(void)
             &g_msg_tx_buffer[0]);
 
     comm_send_msg(msg, &g_comm);
+
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE + 1,
+            NULL,
+            &g_msg_tx_buffer[0]);
 }
 
 static void send_table_req(
@@ -116,6 +130,13 @@ static void send_table_req(
     }
 
     comm_send_msg(tx_msg, &g_comm);
+
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            (uint16_t) tx_msg->header.size,
+            NULL,
+            (const uint8_t*) tx_msg);
 }
 
 static void comm_update_state(void)
@@ -148,6 +169,10 @@ static void comm_update_state(void)
 
         if(msg_found == 1)
         {
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
+
             g_comm.state = COMM_STATE_SEND_REQ0;
             MODLOGD("->STATE_SEND_REQ0");
         }
