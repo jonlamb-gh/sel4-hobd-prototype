@@ -24,6 +24,8 @@ static const char * const ENTRY_TYPE_STR_TABLE[] =
     "NA",
     "BEGIN-FLAG",
     "HOBD-MSG",
+    "FAULT",
+    "HEARTBEAT",
     NULL
 };
 
@@ -92,6 +94,14 @@ static const char *get_entry_type_str(
     else if(type == MMC_ENTRY_TYPE_HOBD_MSG)
     {
         return ENTRY_TYPE_STR_TABLE[3];
+    }
+    else if(type == MMC_ENTRY_TYPE_FAULT)
+    {
+        return ENTRY_TYPE_STR_TABLE[4];
+    }
+    else if(type == MMC_ENTRY_TYPE_HEARTBEAT)
+    {
+        return ENTRY_TYPE_STR_TABLE[5];
     }
     else
     {

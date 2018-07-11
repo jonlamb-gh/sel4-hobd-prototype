@@ -37,6 +37,7 @@
 #include "thread.h"
 #include "time_server_module.h"
 #include "mmc_module.h"
+#include "mmc.h"
 #include "system_module.h"
 #include "hobd_module.h"
 
@@ -91,6 +92,14 @@ int main(
         ZF_LOGD("-------------------");
 
         sel4utils_print_fault_message(info, "fault-handler");
+
+        /* log a fault entry, non-blocking true so it could be dropped */
+        mmc_log_entry_data(
+                MMC_ENTRY_TYPE_FAULT,
+                0,
+                NULL,
+                NULL,
+                1);
 
         debug_dump_scheduler();
     }

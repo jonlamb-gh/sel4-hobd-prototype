@@ -16,6 +16,8 @@
 #include "config.h"
 #include "init_env.h"
 #include "thread.h"
+#include "mmc_entry.h"
+#include "mmc.h"
 #include "system_module.h"
 
 #ifdef SYSMOD_DEBUG
@@ -23,6 +25,8 @@
 #else
 #define MODLOGD(...)
 #endif
+
+#define HEARTBEAT_DELAY_SEC (1)
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[SYSMOD_STACK_SIZE];
@@ -57,8 +61,16 @@ static void sys_thread_fn(const seL4_CPtr ep_cap)
 
     while(1)
     {
-        /* TODO */
-        seL4_Yield();
+        /* log a heartbeat entry, non-blocking true so it could be dropped */
+        mmc_log_entry_data(
+                MMC_ENTRY_TYPE_HEARTBEAT,
+                0,
+                NULL,
+                NULL,
+                1);
+
+        /* TODO - replace rough delay with periodic timer and endpoint */
+        ps_sdelay(HEARTBEAT_DELAY_SEC);
     }
 
     /* should not get here, intentional halt */

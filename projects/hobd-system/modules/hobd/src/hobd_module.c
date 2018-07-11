@@ -64,7 +64,8 @@ static void new_hobd_msg_callback(
             MMC_ENTRY_TYPE_HOBD_MSG,
             (uint16_t) msg->header.size,
             rx_timestamp,
-            (const uint8_t*) msg);
+            (const uint8_t*) msg,
+            0);
 
     /* update the data tables with responses */
     /* TODO */
@@ -89,7 +90,8 @@ static void send_ecu_diag_messages(void)
             MMC_ENTRY_TYPE_HOBD_MSG,
             HOBD_MSG_HEADERCS_SIZE,
             NULL,
-            &g_msg_tx_buffer[0]);
+            &g_msg_tx_buffer[0],
+            0);
 
     ps_mdelay(1);
 
@@ -108,7 +110,8 @@ static void send_ecu_diag_messages(void)
             MMC_ENTRY_TYPE_HOBD_MSG,
             HOBD_MSG_HEADERCS_SIZE + 1,
             NULL,
-            &g_msg_tx_buffer[0]);
+            &g_msg_tx_buffer[0],
+            0);
 }
 
 static void send_table_req(
@@ -136,7 +139,8 @@ static void send_table_req(
             MMC_ENTRY_TYPE_HOBD_MSG,
             (uint16_t) tx_msg->header.size,
             NULL,
-            (const uint8_t*) tx_msg);
+            (const uint8_t*) tx_msg,
+            0);
 }
 
 static void comm_update_state(void)

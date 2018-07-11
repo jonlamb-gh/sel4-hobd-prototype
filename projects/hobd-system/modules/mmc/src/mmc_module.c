@@ -323,7 +323,8 @@ void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
         const uint64_t * const timestamp,
-        const uint8_t * const data)
+        const uint8_t * const data,
+        const uint32_t nonblocking)
 {
     uint64_t local_timestamp = 0;
     const uint64_t *tstamp_ref = &local_timestamp;
@@ -375,5 +376,12 @@ void mmc_log_entry_data(
         seL4_SetMR(3 + idx, data_word);
     }
 
-    seL4_Send(g_thread.ipc_ep_cap, info);
+    if(nonblocking == 0)
+    {
+        seL4_Send(g_thread.ipc_ep_cap, info);
+    }
+    else
+    {
+        seL4_NBSend(g_thread.ipc_ep_cap, info);
+    }
 }

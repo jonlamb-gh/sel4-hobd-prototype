@@ -24,6 +24,7 @@ void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
         const uint64_t * const timestamp,
-        const uint8_t * const data);
+        const uint8_t * const data,
+        const uint32_t nonblocking);
 
 #endif /* MMC_H */
