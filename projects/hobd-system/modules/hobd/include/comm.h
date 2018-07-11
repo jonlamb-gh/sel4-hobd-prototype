@@ -51,6 +51,9 @@ void comm_gpio_init_seq(
         gpio_t * const gpio,
         comm_s * const comm);
 
+void comm_ecu_init_seq(
+        comm_s * const comm);
+
 void comm_send_msg(
         const hobd_msg_s * const msg,
         comm_s * const comm);
@@ -59,6 +62,13 @@ hobd_msg_s *comm_recv_msg(
         const uint32_t use_timeout,
         hobd_parser_s * const parser,
         comm_s * const comm);
+
+uint32_t comm_wait_for_resp(
+        const uint8_t subtype,
+        const uint32_t use_timeout,
+        hobd_parser_s * const parser,
+        comm_s * const comm,
+        uint64_t * const rx_timestamp);
 
 void comm_fill_msg_subgroub_10_query(
         hobd_msg_s * const msg);

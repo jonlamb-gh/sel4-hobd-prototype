@@ -13,10 +13,10 @@ See the `devel` branch for the most recent developments.
 ## TODO
 
 - Add to this doc/other-docs/diagrams/etc
+- Allow not having an MMC attached, disable logger as needed?
 - Cleanup repo, remove old milestone tags
 - Add cmake configs for simulation features
-- Remove hard-coded debug configs
-- Why is `dcache flush; dcache off` in U-boot needed?
+- Why is `dcache off` in U-boot needed?
 
 ## Links
 

@@ -26,6 +26,8 @@
 
 #include <stdint.h>
 
+#define HOBD_KLINE_BAUD (10400UL)
+
 #define HOBD_MSG_HEADER_SIZE (3)
 #define HOBD_MSG_CHECKSUM_SIZE (1)
 #define HOBD_MSG_HEADERCS_SIZE (4)

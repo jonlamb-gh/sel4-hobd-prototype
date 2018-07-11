@@ -2,6 +2,9 @@
  * @file mmc_module.c
  * @brief TODO.
  *
+ * TODO:
+ * - param for non-blocking send?
+ *
  */
 
 #include <stdio.h>

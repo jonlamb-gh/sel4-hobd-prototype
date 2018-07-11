@@ -5,6 +5,7 @@
  * TODO:
  * - should size be total size?
  * - add fault type
+ * - add prev_size for file seeking?
  *
  */
 

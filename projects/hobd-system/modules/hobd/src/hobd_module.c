@@ -46,8 +46,6 @@
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
-#define HOBD_KLINE_BAUD (10400UL)
-
 static comm_s g_comm;
 
 static thread_s g_thread;
@@ -58,30 +56,18 @@ static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
 
 static void new_hobd_msg_callback(
-        const hobd_msg_s * const msg)
+        const hobd_msg_s * const msg,
+        const uint64_t * const rx_timestamp)
 {
+    /* log the message as an MMC entry */
     mmc_log_entry_data(
             MMC_ENTRY_TYPE_HOBD_MSG,
             (uint16_t) msg->header.size,
-            NULL,
+            rx_timestamp,
             (const uint8_t*) msg);
-}
 
-static void ecu_init_seq(void)
-{
-    MODLOGD("Performing ECU GPIO initialization sequence");
-
-    /* perform the init sequence */
-    comm_gpio_init_seq(&g_comm.gpio_uart_tx, &g_comm);
-
-    /* reconfigure the serial port */
-    const int err = serial_configure(
-            &g_comm.char_dev,
-            HOBD_KLINE_BAUD,
-            8,
-            PARITY_NONE,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port");
+    /* update the data tables with responses */
+    /* TODO */
 }
 
 static void send_ecu_diag_messages(void)
@@ -111,47 +97,6 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 }
 
-static uint32_t wait_for_resp(
-        const uint8_t subtype,
-        const uint32_t use_timeout)
-{
-    uint32_t resp_found = 0;
-    uint32_t timeout_fired = 0;
-
-    while((resp_found == 0) && (timeout_fired == 0))
-    {
-        const hobd_msg_s * const msg = comm_recv_msg(
-                use_timeout,
-                &g_msg_parser,
-                &g_comm);
-
-        if(msg != NULL)
-        {
-            if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
-            {
-                if(msg->header.subtype == subtype)
-                {
-                    resp_found = 1;
-                }
-            }
-        }
-        else
-        {
-            timeout_fired = 1;
-        }
-    }
-
-    /* TODO - testing */
-    if(resp_found != 0)
-    {
-        uint64_t resp_time;
-        time_server_get_time(&resp_time);
-        MODLOGD("Response msg time is %llu ns", resp_time);
-    }
-
-    return resp_found;
-}
-
 static void send_table_req(
         const uint8_t table)
 {
@@ -175,13 +120,16 @@ static void send_table_req(
 
 static void comm_update_state(void)
 {
+    uint64_t rx_timestamp;
+
     /* TODO - error/non-blocking */
     /* TODO - better state managment, retry current state, fallback state, etc */
 
     if(g_comm.state == COMM_STATE_GPIO_INIT)
     {
         /* perform the ECU diagnostic init sequence */
-        ecu_init_seq();
+        comm_ecu_init_seq(&g_comm);
+
         g_comm.state = COMM_STATE_SEND_ECU_INIT;
         MODLOGD("->STATE_SEND_ECU_INIT");
     }
@@ -191,7 +139,12 @@ static void comm_update_state(void)
         send_ecu_diag_messages();
 
         /* start timeout and wait for a response */
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_INIT, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_INIT,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
@@ -208,11 +161,18 @@ static void comm_update_state(void)
     {
         send_table_req(HOBD_TABLE_10);
 
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
-            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
 
             g_comm.state = COMM_STATE_SEND_REQ1;
             MODLOGD("->STATE_SEND_REQ1");
@@ -227,11 +187,18 @@ static void comm_update_state(void)
     {
         send_table_req(HOBD_TABLE_D1);
 
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
-            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
 
             g_comm.state = COMM_STATE_SEND_REQ0;
             MODLOGD("->STATE_SEND_REQ0");

@@ -13,6 +13,7 @@
 #include <platsupport/delay.h>
 #include <platsupport/io.h>
 #include <platsupport/chardev.h>
+#include <platsupport/serial.h>
 #include <platsupport/gpio.h>
 #include <platsupport/ltimer.h>
 #include <sel4debug/debug.h>
@@ -87,6 +88,24 @@ void comm_gpio_init_seq(
     ps_mdelay(120);
 }
 
+void comm_ecu_init_seq(
+        comm_s * const comm)
+{
+    MODLOGD("Performing ECU GPIO initialization sequence");
+
+    /* perform the init sequence */
+    comm_gpio_init_seq(&comm->gpio_uart_tx, comm);
+
+    /* reconfigure the serial port */
+    const int err = serial_configure(
+            &comm->char_dev,
+            HOBD_KLINE_BAUD,
+            8,
+            PARITY_NONE,
+            1);
+    ZF_LOGF_IF(err != 0, "Failed to configure serial port");
+}
+
 void comm_send_msg(
         const hobd_msg_s * const msg,
         comm_s * const comm)
@@ -156,6 +175,48 @@ hobd_msg_s *comm_recv_msg(
     }
 
     return msg;
+}
+
+uint32_t comm_wait_for_resp(
+        const uint8_t subtype,
+        const uint32_t use_timeout,
+        hobd_parser_s * const parser,
+        comm_s * const comm,
+        uint64_t * const rx_timestamp)
+{
+    uint32_t resp_found = 0;
+    uint32_t timeout_fired = 0;
+
+    while((resp_found == 0) && (timeout_fired == 0))
+    {
+        const hobd_msg_s * const msg = comm_recv_msg(
+                use_timeout,
+                parser,
+                comm);
+
+        if(msg != NULL)
+        {
+            if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+            {
+                if(msg->header.subtype == subtype)
+                {
+                    resp_found = 1;
+                }
+            }
+        }
+        else
+        {
+            timeout_fired = 1;
+        }
+    }
+
+    if((resp_found != 0) && (rx_timestamp != NULL))
+    {
+        time_server_get_time(rx_timestamp);
+        MODLOGD("Response msg time is %llu ns", *rx_timestamp);
+    }
+
+    return resp_found;
 }
 
 void comm_fill_msg_subgroub_10_query(

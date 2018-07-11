@@ -9,6 +9,7 @@
  *   TODO:
  *   - add thread priority
  *   - use CMake configuration options
+ *   - rebalance affinity
  *
  */
 
@@ -40,15 +41,15 @@
 #define SYSMOD_STACK_SIZE DEFAULT_STACK_SIZE
 #define SYSMOD_EP_BADGE (0x21)
 
-#define HOBDMOD_THREAD_NAME "hobd-comm"
-#define HOBDMOD_THREAD_AFFINITY (2)
-#define HOBDMOD_STACK_SIZE (2 * DEFAULT_STACK_SIZE)
-#define HOBDMOD_EP_BADGE (0x22)
-
 #define MMCMOD_THREAD_NAME "mmc"
-#define MMCMOD_THREAD_AFFINITY (3)
+#define MMCMOD_THREAD_AFFINITY (2)
 #define MMCMOD_STACK_SIZE DEFAULT_STACK_SIZE
 #define MMCMOD_EP_BADGE (0x23)
+
+#define HOBDMOD_THREAD_NAME "hobd-comm"
+#define HOBDMOD_THREAD_AFFINITY (3)
+#define HOBDMOD_STACK_SIZE (2 * DEFAULT_STACK_SIZE)
+#define HOBDMOD_EP_BADGE (0x22)
 
 #ifdef CONFIG_DEBUG_BUILD
 #define TMSERVERMOD_DEBUG
