@@ -37,6 +37,7 @@ See the `devel` branch for the most recent developments.
 TODO - `SIMULATION_BUILD`
 
 ```bash
+# also runs `git submodule update --init`
 ./scripts/apply-patches
 
 ./scripts/build
