@@ -19,3 +19,6 @@
 [submodule "projects/fat_io_lib"]
 	path = projects/fat_io_lib
 	url = https://github.com/jonlamb-gh/fat_io_lib.git
+[submodule "projects/microrl_lib"]
+	path = projects/microrl_lib
+	url = https://github.com/jonlamb-gh/microrl.git

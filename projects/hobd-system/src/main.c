@@ -38,6 +38,7 @@
 #include "time_server_module.h"
 #include "mmc_module.h"
 #include "mmc.h"
+#include "console_module.h"
 #include "system_module.h"
 #include "hobd_module.h"
 
@@ -73,6 +74,7 @@ int main(
     /* initialize modules, not all of them will wait for the system module to start */
     time_server_module_init(&env);
     mmc_module_init(&env);
+    console_module_init(&env);
     hobd_module_init(&env);
     system_module_init(&env);
 
