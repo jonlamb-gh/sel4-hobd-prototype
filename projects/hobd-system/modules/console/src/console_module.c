@@ -9,7 +9,10 @@
 #include <stdint.h>
 
 #include <sel4/sel4.h>
+#include <vka/vka.h>
+#include <vka/object.h>
 #include <sel4debug/debug.h>
+#include <sel4platsupport/device.h>
 #include <platsupport/io.h>
 #include <platsupport/mux.h>
 #include <platsupport/gpio.h>
@@ -39,6 +42,8 @@
 static microrl_t g_microrl_state;
 
 static ps_chardevice_t g_cdev;
+static vka_object_t g_cdev_ntfn;
+static sel4ps_irq_t g_cdev_irq;
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[CONSOLEMOD_STACK_SIZE];
@@ -174,12 +179,14 @@ static void handle_cli_cmd(
 static void console_thread_fn(
         const seL4_CPtr ep_cap)
 {
+    int err;
+
     MODLOGD(CONSOLEMOD_THREAD_NAME " thread is running");
 
     ps_mdelay(CONSOLE_STARTUP_DELAY_MS);
 
     /* reconfigure the serial port */
-    const int err = serial_configure(
+    err = serial_configure(
             &g_cdev,
             CONSOLE_BAUD,
             8,
@@ -197,6 +204,15 @@ static void console_thread_fn(
 
     while(1)
     {
+        /* wait on the IRQ notification */
+        seL4_Word mbadge = 0;
+        seL4_Wait(g_cdev_ntfn.cptr, &mbadge);
+        ZF_LOGF_IF(mbadge != CONSOLE_NOTIFICATION_BADGE, "Invalid badge 0x%X", mbadge);
+
+        /* ack the IRQ */
+        err = seL4_IRQHandler_Ack(g_cdev_irq.handler_path.capPtr);
+        ZF_LOGF_IF(err != 0, "Failed to ack IRQ");
+
         const int data = ps_cdev_getchar(&g_cdev);
 
         if(data >= 0)
@@ -212,12 +228,62 @@ static void console_thread_fn(
 static void init_cdev(
         init_env_s * const env)
 {
+    int err;
+
     /* initialize character device - PS_SERIAL1 = IMX_UART2 - sabre lite console */
     const ps_chardevice_t * const char_dev = ps_cdev_init(
             PS_SERIAL1,
             &env->io_ops,
             &g_cdev);
     ZF_LOGF_IF(char_dev == NULL, "Failed to initialize character device");
+
+    /* construct a IRQ object to get notifications on */
+    g_cdev_irq.irq.type = PS_INTERRUPT;
+    g_cdev_irq.irq.irq.number = UART2_IRQ;
+
+    /* create a notification object for the IRQ */
+    err = vka_alloc_notification(&env->vka, &g_cdev_ntfn);
+    ZF_LOGF_IF(err != 0, "Failed to create notification object");
+
+    /* allocate a cslot for an irq and get the cap for an irq */
+    err = sel4platsupport_copy_irq_cap(
+            &env->vka,
+            &env->simple,
+            &g_cdev_irq.irq,
+            &g_cdev_irq.handler_path);
+    ZF_LOGF_IF(err != 0, "Failed to copy IRQ caps");
+
+    /* allocate a cspace slot */
+    err = vka_cspace_alloc_path(
+            &env->vka,
+            &g_cdev_irq.badged_ntfn_path);
+    ZF_LOGF_IF(err != 0, "Failed to create IRQ cspace slot");
+
+    /* allocate a cspacepath for the capability */
+    cspacepath_t path = {0};
+    vka_cspace_make_path(
+            &env->vka,
+            g_cdev_ntfn.cptr,
+            &path);
+
+    /* badge it */
+    err = vka_cnode_mint(
+            &g_cdev_irq.badged_ntfn_path,
+            &path,
+            seL4_AllRights,
+            CONSOLE_NOTIFICATION_BADGE);
+    ZF_LOGF_IF(err != 0, "Failed to badge IRQ notification");
+
+    /* set notification acking any pending IRQ to ensure
+     * there is no race where we lose an IRQ */
+    err = seL4_IRQHandler_SetNotification(
+            g_cdev_irq.handler_path.capPtr,
+            g_cdev_irq.badged_ntfn_path.capPtr);
+    ZF_LOGF_IF(err != 0, "Failed to set IRQ notification");
+
+    /* formally ack it */
+    err = seL4_IRQHandler_Ack(g_cdev_irq.handler_path.capPtr);
+    ZF_LOGF_IF(err != 0, "Failed to ack IRQ");
 }
 
 void console_module_init(
@@ -234,6 +300,12 @@ void console_module_init(
             &console_thread_fn,
             env,
             &g_thread);
+
+    /* bind timer notification to TCB */
+    const int err = seL4_TCB_BindNotification(
+            g_thread.tcb_object.cptr,
+            g_cdev_ntfn.cptr);
+    ZF_LOGF_IF(err != 0, "Failed to bind notification to thread TCB");
 
     /* set thread priority and affinity */
     thread_set_priority(CONSOLEMOD_THREAD_PRIORITY, &g_thread);
