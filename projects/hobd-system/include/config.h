@@ -18,8 +18,9 @@
 /* TODO */
 #define SIMULATION_BUILD
 
-/* TODO */
+/* TODO - make this bytes? currently uint64's */
 #define DEFAULT_STACK_SIZE (512UL)
+
 #define DEFAULT_THREAD_PRIORITY (seL4_MaxPrio)
 
 /* 32 * 4K = 128K */

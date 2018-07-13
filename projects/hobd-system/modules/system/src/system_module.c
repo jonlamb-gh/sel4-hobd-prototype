@@ -26,7 +26,7 @@
 #define MODLOGD(...)
 #endif
 
-#define HEARTBEAT_DELAY_SEC (1)
+#define HEARTBEAT_DELAY_SEC (4)
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[SYSMOD_STACK_SIZE];

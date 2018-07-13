@@ -27,6 +27,8 @@
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
+#include "mmc.h"
+#include "hobd.h"
 #include "cli.h"
 #include "console_module.h"
 
@@ -173,6 +175,43 @@ static void handle_cli_cmd(
         (void) snprintf(time_str, sizeof(time_str), "%llu", time_sec);
         console_print(time_str);
         console_println(" sec");
+    }
+    else if(cmd == CLI_CMD_STATS)
+    {
+        char str[32];
+
+        console_println("Statistics and Metrics");
+
+        mmc_stats_s mmc_stats;
+        mmc_request_stats(&mmc_stats);
+
+        console_println("MMC");
+        console_print("  timestamp: ");
+        (void) snprintf(str, sizeof(str), "%llu", mmc_stats.timestamp);
+        console_println(str);
+        console_print("  entries_logged: ");
+        (void) snprintf(str, sizeof(str), "%u", mmc_stats.entries_logged);
+        console_println(str);
+
+        hobd_stats_s hobd_stats;
+        hobd_request_stats(&hobd_stats);
+
+        console_println("HOBD");
+        console_print("  timestamp: ");
+        (void) snprintf(str, sizeof(str), "%llu", hobd_stats.timestamp);
+        console_println(str);
+        console_print("  valid_rx_count: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_stats.valid_rx_count);
+        console_println(str);
+        console_print("  invalid_rx_count: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_stats.invalid_rx_count);
+        console_println(str);
+        console_print("  comm_gpio_retry_count: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_stats.comm_gpio_retry_count);
+        console_println(str);
+        console_print("  comm_init_retry_count: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_stats.comm_init_retry_count);
+        console_println(str);
     }
 }
 

@@ -9,9 +9,13 @@
 
 #include <stdint.h>
 
-#include <sel4/bootinfo_types.h>
-
 #include "mmc_entry.h"
+
+typedef struct
+{
+    uint64_t timestamp;
+    uint32_t entries_logged;
+} __attribute__((__packed__)) mmc_stats_s;
 
 /* TODO
 void mmc_log_entry(
@@ -26,5 +30,9 @@ void mmc_log_entry_data(
         const uint64_t * const timestamp,
         const uint8_t * const data,
         const uint32_t nonblocking);
+
+/* blocking */
+void mmc_request_stats(
+        mmc_stats_s * const stats);
 
 #endif /* MMC_H */

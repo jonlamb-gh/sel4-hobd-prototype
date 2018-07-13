@@ -18,6 +18,7 @@ typedef enum
     CLI_CMD_VERSION,
     CLI_CMD_CLEAR,
     CLI_CMD_TIME,
+    CLI_CMD_STATS,
     CLI_CMD_KIND_COUNT,
 } cli_cmd_kind;
 

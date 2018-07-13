@@ -206,6 +206,7 @@ help    - print this help message
 version - print version information
 clear   - clear the scren
 time    - get the current time
+stats   - print module statistics and metrics
 
 IRin > 
 ```

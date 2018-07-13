@@ -33,6 +33,8 @@ typedef struct
     ps_chardevice_t char_dev;
     gpio_sys_t gpio_sys;
     gpio_t gpio_uart_tx;
+    uint16_t comm_gpio_retry_count;
+    uint16_t comm_init_retry_count;
 } comm_s;
 
 /* TODO - comm init/reset/etc */

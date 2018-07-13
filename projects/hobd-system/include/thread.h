@@ -22,7 +22,7 @@ typedef struct
 {
     vka_object_t tcb_object;
     vka_object_t ipc_frame_object;
-    seL4_IPCBuffer ipc_buffer;
+    seL4_IPCBuffer *ipc_buffer;
     vka_object_t ipc_ep;
     seL4_CPtr ipc_ep_cap;
 } thread_s;

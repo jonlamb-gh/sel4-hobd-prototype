@@ -28,15 +28,7 @@ static const cli_cmd_desc_s CMD_DESCRIPTORS[] =
     [CLI_CMD_VERSION] = {"version", " - print version information"},
     [CLI_CMD_CLEAR] = {  "clear", "   - clear the scren"},
     [CLI_CMD_TIME] = {   "time", "    - get the current time"},
-};
-
-static const char * const CMD_STRINGS[] =
-{
-    [CLI_CMD_HELP] = "help",
-    [CLI_CMD_VERSION] = "version",
-    [CLI_CMD_CLEAR] = "clear",
-    [CLI_CMD_TIME] = "time",
-    NULL
+    [CLI_CMD_STATS] = {  "stats", "   - print module statistics and metrics"},
 };
 
 const cli_cmd_desc_s *cli_get_cmd_desc(
@@ -74,7 +66,7 @@ int cli_is_cmd(
     unsigned int idx;
     for(idx = 0; (idx < CLI_CMD_KIND_COUNT) && (ret == CLI_IS_CMD_FALSE); idx += 1)
     {
-        const int cmp = strcmp(str, CMD_STRINGS[idx]);
+        const int cmp = strcmp(str, CMD_DESCRIPTORS[idx].cmd);
 
         if(cmp == 0)
         {

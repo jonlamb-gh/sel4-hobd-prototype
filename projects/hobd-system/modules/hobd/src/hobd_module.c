@@ -30,6 +30,7 @@
 #include "hobd_parser.h"
 #include "hobd_msg.h"
 #include "comm.h"
+#include "hobd.h"
 #include "hobd_module.h"
 
 #ifdef HOBDMOD_DEBUG
@@ -37,6 +38,9 @@
 #else
 #define MODLOGD(...)
 #endif
+
+#define IPC_MSG_TYPE_STATS_REQ (0x2301)
+#define IPC_MSG_TYPE_STATS_RESP (0x2302)
 
 /* see 36.4 IOMUXC of TRM */
 /* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 - SW_PAD_CTL_PAD_SD3_DATA7 */
@@ -143,7 +147,8 @@ static void send_table_req(
             0);
 }
 
-static void comm_update_state(void)
+static void comm_update_state(
+        hobd_stats_s * const stats)
 {
     uint64_t rx_timestamp;
 
@@ -156,12 +161,16 @@ static void comm_update_state(void)
         comm_ecu_init_seq(&g_comm);
 
         g_comm.state = COMM_STATE_SEND_ECU_INIT;
+        stats->comm_gpio_retry_count += 1;
+
         MODLOGD("->STATE_SEND_ECU_INIT");
     }
     else if(g_comm.state == COMM_STATE_SEND_ECU_INIT)
     {
         /* establish a diagnostics connection with the ECU */
         send_ecu_diag_messages();
+
+        stats->comm_init_retry_count += 1;
 
         /* start timeout and wait for a response */
         const uint32_t msg_found = comm_wait_for_resp(
@@ -244,6 +253,8 @@ static void obd_comm_thread_fn(
         const seL4_CPtr ep_cap)
 {
     int err;
+    seL4_Word badge;
+    hobd_stats_s stats = {0};
 
     /* wait for system ready */
     system_module_wait_for_start();
@@ -273,7 +284,50 @@ static void obd_comm_thread_fn(
 
     while(1)
     {
-        comm_update_state();
+        comm_update_state(&stats);
+
+        const seL4_MessageInfo_t info = seL4_NBRecv(
+                ep_cap,
+                &badge);
+
+        const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
+
+        if((badge != 0) && (msg_label != 0))
+        {
+            ZF_LOGF_IF(badge != (HOBDMOD_EP_BADGE + 1), "Invalid IPC badge %u", badge);
+
+            ZF_LOGF_IF(
+                msg_label != IPC_MSG_TYPE_STATS_REQ,
+                "Invalid IPC message lable");
+
+            if(msg_label == IPC_MSG_TYPE_STATS_REQ)
+            {
+                time_server_get_time(&stats.timestamp);
+
+                stats.valid_rx_count = g_msg_parser.valid_count;
+                stats.invalid_rx_count = g_msg_parser.invalid_count;
+
+                const seL4_MessageInfo_t resp_info =
+                        seL4_MessageInfo_new(
+                            IPC_MSG_TYPE_STATS_RESP,
+                            0,
+                            0,
+                            sizeof(stats) / sizeof(seL4_Word));
+
+                seL4_SetMR(0, (seL4_Word) stats.timestamp);
+                seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
+                seL4_SetMR(
+                        2,
+                        ((seL4_Word) stats.valid_rx_count)
+                        | ((seL4_Word) stats.invalid_rx_count << 16));
+                seL4_SetMR(
+                        3,
+                        ((seL4_Word) stats.comm_gpio_retry_count)
+                        | ((seL4_Word) stats.comm_init_retry_count << 16));
+
+                seL4_Reply(resp_info);
+            }
+        }
     }
 
     /* should not get here, intentional halt */
@@ -334,4 +388,32 @@ void hobd_module_init(
 
     /* start the new thread */
     thread_start(&g_thread);
+}
+
+/* blocking */
+void hobd_request_stats(
+        hobd_stats_s * const stats)
+{
+    ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATS_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
+            "Invalid response length of %u words",
+            seL4_MessageInfo_get_length(resp_info));
+
+    stats->timestamp = (uint64_t) seL4_GetMR(0);
+    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
+    stats->valid_rx_count = (uint16_t) (seL4_GetMR(2) & 0xFFFF);
+    stats->invalid_rx_count = (uint16_t) ((seL4_GetMR(2) >> 16) & 0xFFFF);
+    stats->comm_gpio_retry_count = (uint16_t) (seL4_GetMR(3) & 0xFFFF);
+    stats->comm_init_retry_count = (uint16_t) ((seL4_GetMR(3) >> 16) & 0xFFFF);
 }

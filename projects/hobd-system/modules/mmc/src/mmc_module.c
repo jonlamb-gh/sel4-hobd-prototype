@@ -41,6 +41,10 @@
 #define FATIO_MEDIA_RW_FAILURE (0)
 #define FATIO_MEDIA_RW_SUCCESS (1)
 
+#define IPC_MSG_TYPE_ENTRY_LOG (0x2401)
+#define IPC_MSG_TYPE_STATS_REQ (0x2402)
+#define IPC_MSG_TYPE_STATS_RESP (0x2403)
+
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
 
@@ -181,9 +185,9 @@ static int hard_flush_timeout_cb(
 static void mmc_thread_fn(
         const seL4_CPtr ep_cap)
 {
-    uint64_t timestamp;
     seL4_Word badge;
-
+    mmc_stats_s stats = {0};
+    
     /* initialize FAT IO library */
     fl_init();
 
@@ -218,7 +222,7 @@ static void mmc_thread_fn(
 
     MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
-    time_server_get_time(&timestamp);
+    time_server_get_time(&stats.timestamp);
 
     const mmc_entry_s begin_entry_marker =
     {
@@ -226,12 +230,13 @@ static void mmc_thread_fn(
         {
             .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
             .size = 0,
-            .timestamp = timestamp,
+            .timestamp = stats.timestamp,
         }
     };
 
     /* write the begin of log marker */
     write_mmc_entry(&begin_entry_marker, 1);
+    stats.entries_logged += 1;
 
     /* receive MMC entries via IPC endpoint, write them to the MMC FAT filesystem */
     while(1)
@@ -242,21 +247,49 @@ static void mmc_thread_fn(
 
         ZF_LOGF_IF(badge != (MMCMOD_EP_BADGE + 1), "Invalid IPC badge");
 
-        const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
+        const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
 
-        /* reuse badge as index , this is probably unnecessary */
-        for(badge = 0; badge < total_size_words; badge += 1)
+        if(msg_label == IPC_MSG_TYPE_STATS_REQ)
         {
-            g_msg_rx_buffer[badge] = seL4_GetMR(badge);
+            time_server_get_time(&stats.timestamp);
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(
+                        IPC_MSG_TYPE_STATS_RESP,
+                        0,
+                        0,
+                        sizeof(stats) / sizeof(seL4_Word));
+
+            seL4_SetMR(0, (seL4_Word) stats.timestamp);
+            seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
+            seL4_SetMR(2, (seL4_Word) stats.entries_logged);
+
+            seL4_Reply(resp_info);
         }
+        else if(msg_label == IPC_MSG_TYPE_ENTRY_LOG)
+        {
+            const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
 
-        const mmc_entry_s * const entry =
-                (const mmc_entry_s*) &g_msg_rx_buffer[0];
+            /* reuse badge as index , this is probably unnecessary */
+            for(badge = 0; badge < total_size_words; badge += 1)
+            {
+                g_msg_rx_buffer[badge] = seL4_GetMR(badge);
+            }
 
-        ZF_LOGF_IF(entry->header.type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
-        ZF_LOGF_IF(entry->header.size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+            const mmc_entry_s * const entry =
+                    (const mmc_entry_s*) &g_msg_rx_buffer[0];
 
-        write_mmc_entry(entry, 0);
+            ZF_LOGF_IF(entry->header.type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
+            ZF_LOGF_IF(entry->header.size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+
+            write_mmc_entry(entry, 0);
+
+            stats.entries_logged += 1;
+        }
+        else
+        {
+            ZF_LOGF("Invalid message label");
+        }
     }
 
     if(g_file_handle != NULL)
@@ -353,7 +386,7 @@ void mmc_log_entry_data(
             "Failed to log MMC entry data - data size too large");
 
     const seL4_MessageInfo_t info =
-            seL4_MessageInfo_new((seL4_Uint32) type, 0, 0, total_size_words);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_ENTRY_LOG, 0, 0, total_size_words);
 
     /* header in R0:R2 */
     seL4_SetMR(0, (seL4_Word) (type | (data_size << 16)));
@@ -388,4 +421,28 @@ void mmc_log_entry_data(
     {
         seL4_NBSend(g_thread.ipc_ep_cap, info);
     }
+}
+
+void mmc_request_stats(
+        mmc_stats_s * const stats)
+{
+    ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATS_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
+            "Invalid response length of %u words",
+            seL4_MessageInfo_get_length(resp_info));
+
+    stats->timestamp = (uint64_t) seL4_GetMR(0);
+    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
+    stats->entries_logged = (uint32_t) seL4_GetMR(2);
 }
