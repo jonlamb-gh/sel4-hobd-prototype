@@ -178,7 +178,8 @@ static int hard_flush_timeout_cb(
 
 }
 
-static void mmc_thread_fn(const seL4_CPtr ep_cap)
+static void mmc_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     uint64_t timestamp;
     seL4_Word badge;
@@ -188,8 +189,11 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
 
 #ifndef SIMULATION_BUILD
     int err;
+
+#ifdef MMCMOD_DEBUG
     const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
     MODLOGD("MMC capacity = %llu bytes", card_cap);
+#endif
 
     /* attach filesystem mutex functions */
     fl_attach_locks(&fatio_lock, &fatio_unlock);
@@ -310,7 +314,7 @@ void mmc_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(MMCMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(MMCMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", MMCMOD_THREAD_NAME);

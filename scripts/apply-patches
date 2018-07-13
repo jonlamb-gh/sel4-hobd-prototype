@@ -9,4 +9,9 @@ echo "Patching util_libs"
 git apply ../../patches/util_libs.patch
 popd
 
+pushd projects/projects_libs/
+echo "Patching project_libs"
+git apply ../../patches/project_libs.patch
+popd
+
 exit 0

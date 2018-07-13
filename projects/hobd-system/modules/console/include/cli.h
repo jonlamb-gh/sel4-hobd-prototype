@@ -17,10 +17,23 @@ typedef enum
     CLI_CMD_HELP,
     CLI_CMD_VERSION,
     CLI_CMD_CLEAR,
+    CLI_CMD_TIME,
     CLI_CMD_KIND_COUNT,
 } cli_cmd_kind;
 
+typedef struct
+{
+    const char *cmd;
+    const char *desc;
+} cli_cmd_desc_s;
+
+const cli_cmd_desc_s *cli_get_cmd_desc(
+        const cli_cmd_kind cmd);
+
 const char *cli_get_cmd_str(
+        const cli_cmd_kind cmd);
+
+const char *cli_get_cmd_desc_str(
         const cli_cmd_kind cmd);
 
 /* 0 if not a command */

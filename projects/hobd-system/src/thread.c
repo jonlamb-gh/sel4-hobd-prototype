@@ -156,7 +156,7 @@ void thread_set_priority(
     const int err = seL4_TCB_SetPriority(
             thread->tcb_object.cptr,
             seL4_CapInitThreadTCB,
-            seL4_MaxPrio);
+            priority);
     ZF_LOGF_IF(err != 0, "Failed to set thread priority");
 }
 

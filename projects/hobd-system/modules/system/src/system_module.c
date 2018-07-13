@@ -41,7 +41,8 @@ static void signal_ready_to_start(void)
     MODLOGD("System starting");
 }
 
-static void sys_thread_fn(const seL4_CPtr ep_cap)
+static void sys_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -98,7 +99,7 @@ void system_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(SYSMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(SYSMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", SYSMOD_THREAD_NAME);

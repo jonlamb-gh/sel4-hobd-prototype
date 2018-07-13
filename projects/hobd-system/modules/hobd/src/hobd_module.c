@@ -240,7 +240,8 @@ static void comm_update_state(void)
     }
 }
 
-static void obd_comm_thread_fn(const seL4_CPtr ep_cap)
+static void obd_comm_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -326,7 +327,7 @@ void hobd_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(HOBDMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(HOBDMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", HOBDMOD_THREAD_NAME);

@@ -44,34 +44,7 @@ static thread_s g_thread;
 static uint64_t g_thread_stack[CONSOLEMOD_STACK_SIZE];
 
 /* prototypes */
-static void console_print(const char *str);
-static void console_println(const char * const str);
-
-static void print_help(void)
-{
-    console_println("--- hobd console ---");
-    console_println("commands:");
-    console_println("    help    - print this help message");
-    console_println("    version - print version information");
-    console_println("    clear   - clear the scren");
-    console_print("\n");
-}
-
-static void print_version(void)
-{
-    console_println("version information");
-    console_println("  hobd-system: V TODO");
-    console_print("\n");
-}
-
-static void clear_console(void)
-{
-    /* ESC seq for clear entire screen */
-    console_print("\033[2J");
-
-    /* ESC seq for move cursor at left-top corner */
-	console_print("\033[H");
-}
+static void handle_cli_cmd(const cli_cmd_kind cmd);
 
 /* microrl API */
 static void console_print(
@@ -105,18 +78,7 @@ static int console_exec(
 
         if(status == CLI_IS_CMD_TRUE)
         {
-            if(cmd == CLI_CMD_HELP)
-            {
-                print_help();
-            }
-            else if(cmd == CLI_CMD_VERSION)
-            {
-                print_version();
-            }
-            else if(cmd == CLI_CMD_CLEAR)
-            {
-                clear_console();
-            }
+            handle_cli_cmd(cmd);
         }
         else
         {
@@ -136,7 +98,81 @@ static void console_sigint_handler(void)
     console_println("caught SIGINT");
 }
 
-static void console_thread_fn(const seL4_CPtr ep_cap)
+static void print_help(void)
+{
+    console_println("--- hobd console ---");
+    console_println("commands:");
+
+    unsigned int idx;
+    for(idx = CLI_CMD_HELP; idx < CLI_CMD_KIND_COUNT; idx += 1)
+    {
+        console_print(cli_get_cmd_str((cli_cmd_kind) idx));
+        console_println(cli_get_cmd_desc_str((cli_cmd_kind) idx));
+    }
+
+    console_print("\n");
+}
+
+static void print_version(void)
+{
+    console_println("version information");
+    console_println("  hobd-system: V TODO");
+    console_print("\n");
+}
+
+static void clear_console(void)
+{
+    /* ESC seq for clear entire screen */
+    console_print("\033[2J");
+
+    /* ESC seq for move cursor at left-top corner */
+    console_print("\033[H");
+}
+
+static void handle_cli_cmd(
+        const cli_cmd_kind cmd)
+{
+    if(cmd == CLI_CMD_HELP)
+    {
+        print_help();
+    }
+    else if(cmd == CLI_CMD_VERSION)
+    {
+        print_version();
+    }
+    else if(cmd == CLI_CMD_CLEAR)
+    {
+        clear_console();
+    }
+    else if(cmd == CLI_CMD_TIME)
+    {
+        uint64_t time_ns;
+        uint64_t time_sec;
+        uint64_t time_min;
+        char time_str[32];
+
+        time_server_get_time(&time_ns);
+
+        time_min = (time_ns / NS_IN_MINUTE);
+        time_sec = (time_ns - (time_min * NS_IN_MINUTE)) / NS_IN_S;
+
+        console_print("Current time: ");
+        (void) snprintf(time_str, sizeof(time_str), "%llu", time_ns);
+        console_print(time_str);
+        console_println(" ns");
+
+        console_print("Elapsed: ");
+        (void) snprintf(time_str, sizeof(time_str), "%llu", time_min);
+        console_print(time_str);
+        console_print(" min : ");
+        (void) snprintf(time_str, sizeof(time_str), "%llu", time_sec);
+        console_print(time_str);
+        console_println(" sec");
+    }
+}
+
+static void console_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     MODLOGD(CONSOLEMOD_THREAD_NAME " thread is running");
 
@@ -200,7 +236,7 @@ void console_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(CONSOLEMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(CONSOLEMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", CONSOLEMOD_THREAD_NAME);

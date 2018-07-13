@@ -1,0 +1,40 @@
+diff --git a/libsdhcdrivers/src/sdhc.c b/libsdhcdrivers/src/sdhc.c
+index c991fcb..d7ce0f4 100644
+--- a/libsdhcdrivers/src/sdhc.c
++++ b/libsdhcdrivers/src/sdhc.c
+@@ -178,7 +178,7 @@ print_sdhc_regs(struct sdhc *host)
+ {
+     int i;
+     for (i = DS_ADDR; i <= HOST_VERSION; i += 0x4) {
+-        printf("%x: %X\n", i, readl(host->base + i));
++        LOG_INFO("%x: %X\n", i, readl(host->base + i));
+     }
+ }
+ 
+@@ -648,13 +648,13 @@ sdhc_reset(sdio_host_dev_t* sdio)
+     /* Check if a SD card is inserted. */
+     val = readl(host->base + PRES_STATE);
+     if (val & PRES_STATE_CINST) {
+-        printf("Card Inserted");
++        LOG_INFO("Card Inserted");
+         if (!(val & PRES_STATE_WPSPL)) {
+-            printf("(Read Only)");
++            LOG_INFO("(Read Only)");
+         }
+-        printf("...\n");
++        LOG_INFO("...\n");
+     } else {
+-        printf("Card Not Present...\n");
++        LOG_INFO("Card Not Present...\n");
+     }
+ 
+     return 0;
+@@ -691,7 +691,7 @@ sdhc_init(void* iobase, const int* irq_table, int nirqs, ps_io_ops_t* io_ops,
+     sdhc->cmd_list_head = NULL;
+     sdhc->cmd_list_tail = &sdhc->cmd_list_head;
+     sdhc->version = ((readl(sdhc->base + HOST_VERSION) >> 16) & 0xff) + 1;
+-    printf("SDHC version %d.00\n", sdhc->version);
++    LOG_INFO("SDHC version %d.00\n", sdhc->version);
+     /* Initialise SDIO structure */
+     dev->handle_irq = &sdhc_handle_irq;
+     dev->nth_irq = &sdhc_get_nth_irq;

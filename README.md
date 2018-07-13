@@ -4,6 +4,8 @@ Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
 
 Manages a diagnostic connection to the Honda CBR ECU and logs data to an SD card.
 
+There is a simple console available for interracting with the system.
+
 Supported platforms:
 
 - Sabre Lite IMx6, quad core A9
@@ -195,6 +197,17 @@ comm_send_msg@comm.c:101 tx_msg[72:08:72]
 comm_recv_msg@comm.c:137 rx_msg[02:0C:72]
 wait_for_resp@hobd_module.c:134 Response msg time is 244738000 ns
 ...
+
+(press enter to get the console prompt)
+IRin > help
+--- hobd console ---
+commands:
+help    - print this help message
+version - print version information
+clear   - clear the scren
+time    - get the current time
+
+IRin > 
 ```
 
 Running the [fake-hobd-ecu-data](testing-tools/fake-hobd-ecu-data/README.md) tool:
