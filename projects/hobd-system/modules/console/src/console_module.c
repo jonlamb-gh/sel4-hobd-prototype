@@ -16,7 +16,7 @@
 #include <platsupport/chardev.h>
 #include <platsupport/serial.h>
 #include <platsupport/delay.h>
-//#include <sel4utils/sel4_zf_logif.h>
+#include <sel4utils/sel4_zf_logif.h>
 
 #include "microrl/microrl.h"
 
@@ -24,6 +24,7 @@
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
+#include "cli.h"
 #include "console_module.h"
 
 #ifdef CONSOLEMOD_DEBUG
@@ -43,21 +44,52 @@ static thread_s g_thread;
 static uint64_t g_thread_stack[CONSOLEMOD_STACK_SIZE];
 
 /* prototypes */
-static void print_help(void);
+static void console_print(const char *str);
+static void console_println(const char * const str);
+
+static void print_help(void)
+{
+    console_println("--- hobd console ---");
+    console_println("commands:");
+    console_println("    help    - print this help message");
+    console_println("    version - print version information");
+    console_println("    clear   - clear the scren");
+    console_print("\n");
+}
+
+static void print_version(void)
+{
+    console_println("version information");
+    console_println("  hobd-system: V TODO");
+    console_print("\n");
+}
+
+static void clear_console(void)
+{
+    /* ESC seq for clear entire screen */
+    console_print("\033[2J");
+
+    /* ESC seq for move cursor at left-top corner */
+	console_print("\033[H");
+}
 
 /* microrl API */
 static void console_print(
         const char *str)
 {
-    uint32_t idx = 0;
-
-    while(str[idx] != 0)
+    uint32_t idx;
+    for(idx = 0; (str != NULL) && (str[idx] != 0); idx += 1)
     {
-        ps_cdev_putchar(
-                &g_cdev,
-                str[idx]);
-        idx += 1;
+        ps_cdev_putchar(&g_cdev, str[idx]);
     }
+}
+
+/* microrl API */
+static void console_println(
+        const char *str)
+{
+    console_print(str);
+    ps_cdev_putchar(&g_cdev, '\n');
 }
 
 /* microrl API */
@@ -65,8 +97,35 @@ static int console_exec(
         int argc,
         const char * const * argv)
 {
-    /* TODO */
-    print_help();
+    /* arg0 is the command */
+    if(argc > 0)
+    {
+        cli_cmd_kind cmd;
+        const int status = cli_is_cmd(argv[0], &cmd);
+
+        if(status == CLI_IS_CMD_TRUE)
+        {
+            if(cmd == CLI_CMD_HELP)
+            {
+                print_help();
+            }
+            else if(cmd == CLI_CMD_VERSION)
+            {
+                print_version();
+            }
+            else if(cmd == CLI_CMD_CLEAR)
+            {
+                clear_console();
+            }
+        }
+        else
+        {
+            console_print(argv[0]);
+            console_println(": command not found");
+        }
+    }
+
+    /* TODO - args/options ? */
 
     return 0;
 }
@@ -74,13 +133,7 @@ static int console_exec(
 /* microrl API */
 static void console_sigint_handler(void)
 {
-    console_print("caught SIGINT\n");
-}
-
-/* TODO - hook up formatting */
-static void print_help(void)
-{
-    console_print("help message here\n");
+    console_println("caught SIGINT");
 }
 
 static void console_thread_fn(const seL4_CPtr ep_cap)

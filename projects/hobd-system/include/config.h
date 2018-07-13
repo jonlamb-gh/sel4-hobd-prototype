@@ -56,6 +56,8 @@
 #define CONSOLEMOD_STACK_SIZE (2 * DEFAULT_STACK_SIZE)
 #define CONSOLEMOD_EP_BADGE (0x24)
 
+/* module specific verbose logging */
+/*
 #ifdef CONFIG_DEBUG_BUILD
 #define TMSERVERMOD_DEBUG
 #define SYSMOD_DEBUG
@@ -63,5 +65,6 @@
 #define HOBDMOD_DEBUG
 #define CONSOLEMOD_DEBUG
 #endif
+*/
 
 #endif /* CONFIG_H */
