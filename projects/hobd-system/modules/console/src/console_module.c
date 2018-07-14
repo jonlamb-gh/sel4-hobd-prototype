@@ -233,11 +233,11 @@ static void handle_cli_cmd(
         }
     }
     else if(cmd == CLI_CMD_MMC_RM)
-    {   
+    {
         const int status = mmc_rm();
-        
+
         if(status == 0)
-        {   
+        {
             console_println("Deleted the MMC file");
         }
         else
