@@ -51,13 +51,13 @@ void thread_create(
 
     /* create a IPC buffer and capability for it */
     seL4_CPtr ipc_pd_cap = 0;
-    seL4_IPCBuffer * const ipc_buffer = (seL4_IPCBuffer*) vspace_new_ipc_buffer(
+    thread->ipc_buffer = (seL4_IPCBuffer*) vspace_new_ipc_buffer(
             &env->vspace,
             &ipc_pd_cap);
-    assert(ipc_buffer != NULL);
+    assert(thread->ipc_buffer != NULL);
 
     /* points to itself for now, could be a better wrapper structure */
-    ipc_buffer->userData = (seL4_Word) ipc_buffer;
+    thread->ipc_buffer->userData = (seL4_Word) thread->ipc_buffer;
 
     /* create a IPC endpoint */
     err = vka_alloc_endpoint(
@@ -110,7 +110,7 @@ void thread_create(
             seL4_NilData,
             pd_cap,
             seL4_NilData,
-            (seL4_Word) ipc_buffer,
+            (seL4_Word) thread->ipc_buffer,
             thread->ipc_frame_object.cptr);
     ZF_LOGF_IF(err != 0, "Failed to configure new TCB object");
 
@@ -156,7 +156,7 @@ void thread_set_priority(
     const int err = seL4_TCB_SetPriority(
             thread->tcb_object.cptr,
             seL4_CapInitThreadTCB,
-            seL4_MaxPrio);
+            priority);
     ZF_LOGF_IF(err != 0, "Failed to set thread priority");
 }
 

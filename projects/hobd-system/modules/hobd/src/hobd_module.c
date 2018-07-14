@@ -30,6 +30,7 @@
 #include "hobd_parser.h"
 #include "hobd_msg.h"
 #include "comm.h"
+#include "hobd.h"
 #include "hobd_module.h"
 
 #ifdef HOBDMOD_DEBUG
@@ -38,6 +39,9 @@
 #define MODLOGD(...)
 #endif
 
+#define IPC_MSG_TYPE_STATS_REQ (0x2301)
+#define IPC_MSG_TYPE_STATS_RESP (0x2302)
+
 /* see 36.4 IOMUXC of TRM */
 /* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 - SW_PAD_CTL_PAD_SD3_DATA7 */
 #define UART_TX_PORT (GPIO_BANK6)
@@ -45,8 +49,6 @@
 
 #define MSG_RX_BUFFER_SIZE (512)
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
-
-#define HOBD_KLINE_BAUD (10400UL)
 
 static comm_s g_comm;
 
@@ -58,29 +60,19 @@ static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
 
 static void new_hobd_msg_callback(
-        const hobd_msg_s * const msg)
+        const hobd_msg_s * const msg,
+        const uint64_t * const rx_timestamp)
 {
+    /* log the message as an MMC entry */
     mmc_log_entry_data(
             MMC_ENTRY_TYPE_HOBD_MSG,
             (uint16_t) msg->header.size,
-            (const uint8_t*) msg);
-}
+            rx_timestamp,
+            (const uint8_t*) msg,
+            0);
 
-static void ecu_init_seq(void)
-{
-    MODLOGD("Performing ECU GPIO initialization sequence");
-
-    /* perform the init sequence */
-    comm_gpio_init_seq(&g_comm.gpio_uart_tx, &g_comm);
-
-    /* reconfigure the serial port */
-    const int err = serial_configure(
-            &g_comm.char_dev,
-            HOBD_KLINE_BAUD,
-            8,
-            PARITY_NONE,
-            1);
-    ZF_LOGF_IF(err != 0, "Failed to configure serial port");
+    /* update the data tables with responses */
+    /* TODO */
 }
 
 static void send_ecu_diag_messages(void)
@@ -97,6 +89,14 @@ static void send_ecu_diag_messages(void)
 
     comm_send_msg(msg, &g_comm);
 
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE,
+            NULL,
+            &g_msg_tx_buffer[0],
+            0);
+
     ps_mdelay(1);
 
     /* create a diagnostic init message */
@@ -108,47 +108,14 @@ static void send_ecu_diag_messages(void)
             &g_msg_tx_buffer[0]);
 
     comm_send_msg(msg, &g_comm);
-}
 
-static uint32_t wait_for_resp(
-        const uint8_t subtype,
-        const uint32_t use_timeout)
-{
-    uint32_t resp_found = 0;
-    uint32_t timeout_fired = 0;
-
-    while((resp_found == 0) && (timeout_fired == 0))
-    {
-        const hobd_msg_s * const msg = comm_recv_msg(
-                use_timeout,
-                &g_msg_parser,
-                &g_comm);
-
-        if(msg != NULL)
-        {
-            if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
-            {
-                if(msg->header.subtype == subtype)
-                {
-                    resp_found = 1;
-                }
-            }
-        }
-        else
-        {
-            timeout_fired = 1;
-        }
-    }
-
-    /* TODO - testing */
-    if(resp_found != 0)
-    {
-        uint64_t resp_time;
-        time_server_get_time(&resp_time);
-        MODLOGD("Response msg time is %llu ns", resp_time);
-    }
-
-    return resp_found;
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE + 1,
+            NULL,
+            &g_msg_tx_buffer[0],
+            0);
 }
 
 static void send_table_req(
@@ -170,18 +137,32 @@ static void send_table_req(
     }
 
     comm_send_msg(tx_msg, &g_comm);
+
+    /* TESTING - log tx messages */
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            (uint16_t) tx_msg->header.size,
+            NULL,
+            (const uint8_t*) tx_msg,
+            0);
 }
 
-static void comm_update_state(void)
+static void comm_update_state(
+        hobd_stats_s * const stats)
 {
+    uint64_t rx_timestamp;
+
     /* TODO - error/non-blocking */
     /* TODO - better state managment, retry current state, fallback state, etc */
 
     if(g_comm.state == COMM_STATE_GPIO_INIT)
     {
         /* perform the ECU diagnostic init sequence */
-        ecu_init_seq();
+        comm_ecu_init_seq(&g_comm);
+
         g_comm.state = COMM_STATE_SEND_ECU_INIT;
+        stats->comm_gpio_retry_count += 1;
+
         MODLOGD("->STATE_SEND_ECU_INIT");
     }
     else if(g_comm.state == COMM_STATE_SEND_ECU_INIT)
@@ -189,11 +170,22 @@ static void comm_update_state(void)
         /* establish a diagnostics connection with the ECU */
         send_ecu_diag_messages();
 
+        stats->comm_init_retry_count += 1;
+
         /* start timeout and wait for a response */
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_INIT, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_INIT,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
+
             g_comm.state = COMM_STATE_SEND_REQ0;
             MODLOGD("->STATE_SEND_REQ0");
         }
@@ -207,11 +199,18 @@ static void comm_update_state(void)
     {
         send_table_req(HOBD_TABLE_10);
 
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
-            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
 
             g_comm.state = COMM_STATE_SEND_REQ1;
             MODLOGD("->STATE_SEND_REQ1");
@@ -226,11 +225,18 @@ static void comm_update_state(void)
     {
         send_table_req(HOBD_TABLE_D1);
 
-        const uint32_t msg_found = wait_for_resp(HOBD_MSG_SUBTYPE_TABLE_SUBGROUP, 1);
+        const uint32_t msg_found = comm_wait_for_resp(
+                HOBD_MSG_SUBTYPE_TABLE_SUBGROUP,
+                1,
+                &g_msg_parser,
+                &g_comm,
+                &rx_timestamp);
 
         if(msg_found == 1)
         {
-            new_hobd_msg_callback((const hobd_msg_s*) &g_msg_rx_buffer[0]);
+            new_hobd_msg_callback(
+                    (const hobd_msg_s*) &g_msg_rx_buffer[0],
+                    &rx_timestamp);
 
             g_comm.state = COMM_STATE_SEND_REQ0;
             MODLOGD("->STATE_SEND_REQ0");
@@ -243,9 +249,12 @@ static void comm_update_state(void)
     }
 }
 
-static void obd_comm_thread_fn(const seL4_CPtr ep_cap)
+static void obd_comm_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     int err;
+    seL4_Word badge;
+    hobd_stats_s stats = {0};
 
     /* wait for system ready */
     system_module_wait_for_start();
@@ -275,7 +284,50 @@ static void obd_comm_thread_fn(const seL4_CPtr ep_cap)
 
     while(1)
     {
-        comm_update_state();
+        comm_update_state(&stats);
+
+        const seL4_MessageInfo_t info = seL4_NBRecv(
+                ep_cap,
+                &badge);
+
+        const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
+
+        if((badge != 0) && (msg_label != 0))
+        {
+            ZF_LOGF_IF(badge != (HOBDMOD_EP_BADGE + 1), "Invalid IPC badge %u", badge);
+
+            ZF_LOGF_IF(
+                msg_label != IPC_MSG_TYPE_STATS_REQ,
+                "Invalid IPC message lable");
+
+            if(msg_label == IPC_MSG_TYPE_STATS_REQ)
+            {
+                time_server_get_time(&stats.timestamp);
+
+                stats.valid_rx_count = g_msg_parser.valid_count;
+                stats.invalid_rx_count = g_msg_parser.invalid_count;
+
+                const seL4_MessageInfo_t resp_info =
+                        seL4_MessageInfo_new(
+                            IPC_MSG_TYPE_STATS_RESP,
+                            0,
+                            0,
+                            sizeof(stats) / sizeof(seL4_Word));
+
+                seL4_SetMR(0, (seL4_Word) stats.timestamp);
+                seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
+                seL4_SetMR(
+                        2,
+                        ((seL4_Word) stats.valid_rx_count)
+                        | ((seL4_Word) stats.invalid_rx_count << 16));
+                seL4_SetMR(
+                        3,
+                        ((seL4_Word) stats.comm_gpio_retry_count)
+                        | ((seL4_Word) stats.comm_init_retry_count << 16));
+
+                seL4_Reply(resp_info);
+            }
+        }
     }
 
     /* should not get here, intentional halt */
@@ -329,11 +381,39 @@ void hobd_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(HOBDMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(HOBDMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", HOBDMOD_THREAD_NAME);
 
     /* start the new thread */
     thread_start(&g_thread);
+}
+
+/* blocking */
+void hobd_request_stats(
+        hobd_stats_s * const stats)
+{
+    ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATS_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
+            "Invalid response length of %u words",
+            seL4_MessageInfo_get_length(resp_info));
+
+    stats->timestamp = (uint64_t) seL4_GetMR(0);
+    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
+    stats->valid_rx_count = (uint16_t) (seL4_GetMR(2) & 0xFFFF);
+    stats->invalid_rx_count = (uint16_t) ((seL4_GetMR(2) >> 16) & 0xFFFF);
+    stats->comm_gpio_retry_count = (uint16_t) (seL4_GetMR(3) & 0xFFFF);
+    stats->comm_init_retry_count = (uint16_t) ((seL4_GetMR(3) >> 16) & 0xFFFF);
 }

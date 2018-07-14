@@ -56,7 +56,8 @@ static void tm_unlock(void)
     ZF_LOGF_IF(err != 0, "Failed to unlock tm mutex");
 }
 
-static void time_server_thread_fn(const seL4_CPtr ep_cap)
+static void time_server_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     int err;
 
@@ -155,7 +156,7 @@ void time_server_module_init(
     init_tm(env);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(TMSERVERMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(TMSERVERMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", TMSERVERMOD_THREAD_NAME);

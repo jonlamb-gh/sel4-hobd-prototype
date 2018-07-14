@@ -2,6 +2,9 @@
  * @file mmc_module.c
  * @brief TODO.
  *
+ * TODO:
+ * - param for non-blocking send?
+ *
  */
 
 #include <stdio.h>
@@ -37,6 +40,14 @@
 
 #define FATIO_MEDIA_RW_FAILURE (0)
 #define FATIO_MEDIA_RW_SUCCESS (1)
+
+#define IPC_MSG_TYPE_ENTRY_LOG (0x2401)
+#define IPC_MSG_TYPE_STATS_REQ (0x2402)
+#define IPC_MSG_TYPE_STATS_RESP (0x2403)
+#define IPC_MSG_TYPE_CMD_RM (0x2404)
+#define IPC_MSG_TYPE_CMD_RM_RESP (0x2405)
+#define IPC_MSG_TYPE_CMD_FILE_SIZE (0x2406)
+#define IPC_MSG_TYPE_CMD_FILE_SIZE_RESP (0x2407)
 
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
@@ -149,7 +160,7 @@ static void write_mmc_entry(
 #ifndef SIMULATION_BUILD
     ZF_LOGF_IF(g_file_handle == NULL, "MMC file handle is invalid");
 
-    const uint16_t entry_size_bytes = entry->size + MMC_ENTRY_HEADER_SIZE;
+    const uint16_t entry_size_bytes = mmc_entry_total_size(entry);
 
     int err = fl_fwrite((void*) entry, 1, entry_size_bytes, g_file_handle);
     ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC");
@@ -175,17 +186,22 @@ static int hard_flush_timeout_cb(
 
 }
 
-static void mmc_thread_fn(const seL4_CPtr ep_cap)
+static void mmc_thread_fn(
+        const seL4_CPtr ep_cap)
 {
     seL4_Word badge;
+    mmc_stats_s stats = {0};
 
     /* initialize FAT IO library */
     fl_init();
 
 #ifndef SIMULATION_BUILD
     int err;
+
+#ifdef MMCMOD_DEBUG
     const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
     MODLOGD("MMC capacity = %llu bytes", card_cap);
+#endif
 
     /* attach filesystem mutex functions */
     fl_attach_locks(&fatio_lock, &fatio_unlock);
@@ -210,14 +226,21 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
 
     MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
+    time_server_get_time(&stats.timestamp);
+
     const mmc_entry_s begin_entry_marker =
     {
-        .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
-        .size = 0
+        .header =
+        {
+            .type = MMC_ENTRY_TYPE_BEGIN_FLAG,
+            .size = 0,
+            .timestamp = stats.timestamp,
+        }
     };
 
     /* write the begin of log marker */
     write_mmc_entry(&begin_entry_marker, 1);
+    stats.entries_logged += 1;
 
     /* receive MMC entries via IPC endpoint, write them to the MMC FAT filesystem */
     while(1)
@@ -228,21 +251,103 @@ static void mmc_thread_fn(const seL4_CPtr ep_cap)
 
         ZF_LOGF_IF(badge != (MMCMOD_EP_BADGE + 1), "Invalid IPC badge");
 
-        const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
+        const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
 
-        /* reuse badge as index , this is probably unnecessary */
-        for(badge = 0; badge < total_size_words; badge += 1)
+        if(msg_label == IPC_MSG_TYPE_STATS_REQ)
         {
-            g_msg_rx_buffer[badge] = seL4_GetMR(badge);
+            time_server_get_time(&stats.timestamp);
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(
+                        IPC_MSG_TYPE_STATS_RESP,
+                        0,
+                        0,
+                        sizeof(stats) / sizeof(seL4_Word));
+
+            seL4_SetMR(0, (seL4_Word) stats.timestamp);
+            seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
+            seL4_SetMR(2, (seL4_Word) stats.entries_logged);
+
+            seL4_Reply(resp_info);
         }
+        else if(msg_label == IPC_MSG_TYPE_ENTRY_LOG)
+        {
+            const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
 
-        const mmc_entry_s * const entry =
-                (const mmc_entry_s*) &g_msg_rx_buffer[0];
+            /* reuse badge as index , this is probably unnecessary */
+            for(badge = 0; badge < total_size_words; badge += 1)
+            {
+                g_msg_rx_buffer[badge] = seL4_GetMR(badge);
+            }
 
-        ZF_LOGF_IF(entry->type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
-        ZF_LOGF_IF(entry->size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+            const mmc_entry_s * const entry =
+                    (const mmc_entry_s*) &g_msg_rx_buffer[0];
 
-        write_mmc_entry(entry, 0);
+            ZF_LOGF_IF(entry->header.type == MMC_ENTRY_TYPE_INVALID, "Invalid entry type");
+            ZF_LOGF_IF(entry->header.size > MMC_ENTRY_DATA_SIZE_MAX, "Entry size is too large");
+
+            write_mmc_entry(entry, 0);
+
+            stats.entries_logged += 1;
+        }
+        else if(msg_label == IPC_MSG_TYPE_CMD_FILE_SIZE)
+        {
+            uint32_t file_size = 0;
+            uint32_t cmd_status = 0;
+
+#ifndef SIMULATION_BUILD
+            fatio_lock();
+            if(g_file_handle != NULL)
+            {
+                file_size = (uint32_t) g_file_handle->filelength;
+            }
+            fatio_unlock();
+
+            if(file_size == 0)
+            {
+                cmd_status = 1;
+            }
+#endif
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE_RESP, 0, 0, 2);
+
+            seL4_SetMR(0, (seL4_Word) cmd_status);
+            seL4_SetMR(1, (seL4_Word) file_size);
+
+            seL4_Reply(resp_info);
+        }
+        else if(msg_label == IPC_MSG_TYPE_CMD_RM)
+        {
+            uint32_t cmd_status = 0;
+
+            stats.entries_logged = 0;
+
+#ifndef SIMULATION_BUILD
+            fl_fclose(g_file_handle);
+
+            const int rm_status = fl_remove(FILE_NAME);
+
+            g_file_handle = fl_fopen(FILE_NAME, "wba");
+            ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
+
+            if(rm_status != 0)
+            {
+                cmd_status = 1;
+            }
+#endif
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM_RESP, 0, 0, 1);
+
+            seL4_SetMR(0, (seL4_Word) cmd_status);
+
+            seL4_Reply(resp_info);
+        }
+        else
+        {
+            ZF_LOGF("Invalid message label");
+        }
     }
 
     if(g_file_handle != NULL)
@@ -300,7 +405,7 @@ void mmc_module_init(
             &g_thread);
 
     /* set thread priority and affinity */
-    thread_set_priority(seL4_MaxPrio, &g_thread);
+    thread_set_priority(MMCMOD_THREAD_PRIORITY, &g_thread);
     thread_set_affinity(MMCMOD_THREAD_AFFINITY, &g_thread);
 
     MODLOGD("%s is initialized", MMCMOD_THREAD_NAME);
@@ -312,8 +417,22 @@ void mmc_module_init(
 void mmc_log_entry_data(
         const uint16_t type,
         const uint16_t data_size,
-        const uint8_t * const data)
+        const uint64_t * const timestamp,
+        const uint8_t * const data,
+        const uint32_t nonblocking)
 {
+    uint64_t local_timestamp = 0;
+    const uint64_t *tstamp_ref = &local_timestamp;
+
+    if(timestamp != NULL)
+    {
+        tstamp_ref = timestamp;
+    }
+    else
+    {
+        time_server_get_time(&local_timestamp);
+    }
+
     const seL4_Word size_bytes = (seL4_Word) (data_size + MMC_ENTRY_HEADER_SIZE);
     const seL4_Word total_size_bytes = align_up(size_bytes, 4);
     const seL4_Word total_size_words = (seL4_Word) (total_size_bytes / sizeof(seL4_Word));
@@ -325,13 +444,16 @@ void mmc_log_entry_data(
             "Failed to log MMC entry data - data size too large");
 
     const seL4_MessageInfo_t info =
-            seL4_MessageInfo_new((seL4_Uint32) type, 0, 0, total_size_words);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_ENTRY_LOG, 0, 0, total_size_words);
 
-    /* header in R0 */
+    /* header in R0:R2 */
     seL4_SetMR(0, (seL4_Word) (type | (data_size << 16)));
+    seL4_SetMR(1, (seL4_Word) ((*tstamp_ref) & 0xFFFFFFFF));
+    seL4_SetMR(2, (seL4_Word) (((*tstamp_ref) >> 32) & 0xFFFFFFFF));
 
+    /* -3 for header size words */
     uint32_t idx;
-    for(idx = 0; idx < (total_size_words - 1); idx += 1)
+    for(idx = 0; idx < (total_size_words - 3); idx += 1)
     {
         seL4_Word data_word = 0;
 
@@ -342,12 +464,107 @@ void mmc_log_entry_data(
 
             if(data_index < (uint32_t) data_size)
             {
-                data_word |= (data[data_index] << shift);
+                data_word |= (data[data_index] << (shift * 8));
             }
         }
 
-        seL4_SetMR(1 + idx, data_word);
+        seL4_SetMR(3 + idx, data_word);
     }
 
-    seL4_Send(g_thread.ipc_ep_cap, info);
+    if(nonblocking == 0)
+    {
+        seL4_Send(g_thread.ipc_ep_cap, info);
+    }
+    else
+    {
+        seL4_NBSend(g_thread.ipc_ep_cap, info);
+    }
+}
+
+void mmc_request_stats(
+        mmc_stats_s * const stats)
+{
+    ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATS_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
+            "Invalid response length");
+
+    stats->timestamp = (uint64_t) seL4_GetMR(0);
+    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
+    stats->entries_logged = (uint32_t) seL4_GetMR(2);
+}
+
+int mmc_rm(void)
+{
+    int ret = 0;
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_RM_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    if(ret == 0)
+    {
+        const seL4_Word cmd_resp = seL4_GetMR(0);
+
+        ret = (int) cmd_resp;
+    }
+
+    return ret;
+}
+
+int mmc_file_size(
+        uint32_t * const size)
+{
+    int ret = 0;
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_FILE_SIZE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 2,
+            "Invalid response length");
+
+    if(ret == 0)
+    {
+        const seL4_Word cmd_resp = seL4_GetMR(0);
+        const seL4_Word file_size = seL4_GetMR(1);
+
+        ret = (int) cmd_resp;
+
+        if(ret == 0)
+        {
+            *size = (uint32_t) file_size;
+        }
+        else
+        {
+            *size = 0;
+        }
+    }
+
+    return ret;
 }

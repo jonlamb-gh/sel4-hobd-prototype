@@ -11,6 +11,9 @@ config_option(
     DEFAULT ON
 )
 
+# enable all 4 cores in QEMU
+set(QemuFlags "-smp cores=4")
+
 ApplyCommonSimulationSettings()
 
 ApplyData61ElfLoaderSettings()
@@ -19,6 +22,8 @@ add_executable(
     hobd-system
     modules/time_server/src/time_server_module.c
     modules/mmc/src/mmc_module.c
+    modules/console/src/cli.c
+    modules/console/src/console_module.c
     modules/hobd/src/hobd_parser.c
     modules/hobd/src/comm.c
     modules/hobd/src/hobd_module.c
@@ -64,6 +69,7 @@ target_include_directories(
     PRIVATE
     modules/time_server/include
     modules/mmc/include
+    modules/console/include
     modules/hobd/include
     modules/system/include
     include)
@@ -86,7 +92,8 @@ target_link_libraries(
     cpio
     elf
     sdhcdrivers
-    fatio)
+    fatio
+    microrl)
 
 DeclareRootserver(hobd-system)
 
