@@ -107,7 +107,7 @@ static void console_sigint_handler(void)
 
 static void print_help(void)
 {
-    console_println("--- hobd console ---");
+    console_println("--- console ---");
     console_println("commands:");
 
     unsigned int idx;
@@ -212,6 +212,43 @@ static void handle_cli_cmd(
         console_print("  comm_init_retry_count: ");
         (void) snprintf(str, sizeof(str), "%u", hobd_stats.comm_init_retry_count);
         console_println(str);
+    }
+    else if(cmd == CLI_CMD_MMC_FILE_SIZE)
+    {
+        uint32_t file_size;
+        char str[32];
+
+        const int status = mmc_file_size(&file_size);
+
+        if(status == 0)
+        {
+            console_print("MMC file size: ");
+            (void) snprintf(str, sizeof(str), "%u", file_size);
+            console_print(str);
+            console_println(" bytes");
+        }
+        else
+        {
+            console_println("Failed to get MMC file size");
+        }
+    }
+    else if(cmd == CLI_CMD_MMC_RM)
+    {   
+        const int status = mmc_rm();
+        
+        if(status == 0)
+        {   
+            console_println("Deleted the MMC file");
+        }
+        else
+        {
+            console_println("Failed to delete the MMC file");
+        }
+    }
+    else
+    {
+        console_print(cli_get_cmd_str(cmd));
+        console_println(": not yet supported");
     }
 }
 

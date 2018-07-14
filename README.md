@@ -12,14 +12,6 @@ Supported platforms:
 
 See the `devel` branch for the most recent developments.
 
-## TODO
-
-- Add to this doc/other-docs/diagrams/etc
-- Allow not having an MMC attached, disable logger as needed?
-- Cleanup repo, remove old milestone tags
-- Add cmake configs for simulation features
-- Why is `dcache off` in U-boot needed?
-
 ## Links
 
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
@@ -204,7 +196,7 @@ IRin > help
 commands:
 help    - print this help message
 version - print version information
-clear   - clear the scren
+clear   - clear the screen
 time    - get the current time
 stats   - print module statistics and metrics
 

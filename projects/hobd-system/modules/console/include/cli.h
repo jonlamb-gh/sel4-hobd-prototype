@@ -19,6 +19,8 @@ typedef enum
     CLI_CMD_CLEAR,
     CLI_CMD_TIME,
     CLI_CMD_STATS,
+    CLI_CMD_MMC_FILE_SIZE,
+    CLI_CMD_MMC_RM,
     CLI_CMD_KIND_COUNT,
 } cli_cmd_kind;
 

@@ -16,7 +16,7 @@
 #define CONFIG_H
 
 /* TODO */
-#define SIMULATION_BUILD
+//#define SIMULATION_BUILD
 
 /* TODO - make this bytes? currently uint64's */
 #define DEFAULT_STACK_SIZE (512UL)

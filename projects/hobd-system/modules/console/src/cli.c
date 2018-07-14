@@ -24,11 +24,20 @@
 
 static const cli_cmd_desc_s CMD_DESCRIPTORS[] =
 {
-    [CLI_CMD_HELP] = {   "help", "    - print this help message"},
-    [CLI_CMD_VERSION] = {"version", " - print version information"},
-    [CLI_CMD_CLEAR] = {  "clear", "   - clear the scren"},
-    [CLI_CMD_TIME] = {   "time", "    - get the current time"},
-    [CLI_CMD_STATS] = {  "stats", "   - print module statistics and metrics"},
+    [CLI_CMD_HELP] =
+        {"help", "       - print this help message"},
+    [CLI_CMD_VERSION] =
+        {"version", "    - print version information"},
+    [CLI_CMD_CLEAR] =
+        {"clear", "      - clear the screen"},
+    [CLI_CMD_TIME] =
+        {"time", "       - get the current time"},
+    [CLI_CMD_STATS] =
+        {"stats", "      - print module statistics and metrics"},
+    [CLI_CMD_MMC_FILE_SIZE] =
+        {"mmc-size", "   - get current MMC file size"},
+    [CLI_CMD_MMC_RM] =
+        {"mmc-rm", "     - delete the current MMC file"}
 };
 
 const cli_cmd_desc_s *cli_get_cmd_desc(

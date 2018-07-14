@@ -44,6 +44,10 @@
 #define IPC_MSG_TYPE_ENTRY_LOG (0x2401)
 #define IPC_MSG_TYPE_STATS_REQ (0x2402)
 #define IPC_MSG_TYPE_STATS_RESP (0x2403)
+#define IPC_MSG_TYPE_CMD_RM (0x2404)
+#define IPC_MSG_TYPE_CMD_RM_RESP (0x2405)
+#define IPC_MSG_TYPE_CMD_FILE_SIZE (0x2406)
+#define IPC_MSG_TYPE_CMD_FILE_SIZE_RESP (0x2407)
 
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
@@ -187,7 +191,7 @@ static void mmc_thread_fn(
 {
     seL4_Word badge;
     mmc_stats_s stats = {0};
-    
+
     /* initialize FAT IO library */
     fl_init();
 
@@ -285,6 +289,60 @@ static void mmc_thread_fn(
             write_mmc_entry(entry, 0);
 
             stats.entries_logged += 1;
+        }
+        else if(msg_label == IPC_MSG_TYPE_CMD_FILE_SIZE)
+        {
+            uint32_t file_size = 0;
+            uint32_t cmd_status = 0;
+
+#ifndef SIMULATION_BUILD
+            fatio_lock();
+            if(g_file_handle != NULL)
+            {
+                file_size = (uint32_t) g_file_handle->filelength;
+            }
+            fatio_unlock();
+
+            if(file_size == 0)
+            {
+                cmd_status = 1;
+            }
+#endif
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE_RESP, 0, 0, 2);
+
+            seL4_SetMR(0, (seL4_Word) cmd_status);
+            seL4_SetMR(1, (seL4_Word) file_size);
+
+            seL4_Reply(resp_info);
+        }
+        else if(msg_label == IPC_MSG_TYPE_CMD_RM)
+        {
+            uint32_t cmd_status = 0;
+
+            stats.entries_logged = 0;
+
+#ifndef SIMULATION_BUILD
+            fl_fclose(g_file_handle);
+
+            const int rm_status = fl_remove(FILE_NAME);
+
+            g_file_handle = fl_fopen(FILE_NAME, "wba");
+            ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
+
+            if(rm_status != 0)
+            {
+                cmd_status = 1;
+            }
+#endif
+
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM_RESP, 0, 0, 1);
+
+            seL4_SetMR(0, (seL4_Word) cmd_status);
+
+            seL4_Reply(resp_info);
         }
         else
         {
@@ -439,10 +497,74 @@ void mmc_request_stats(
 
     ZF_LOGF_IF(
             (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
-            "Invalid response length of %u words",
-            seL4_MessageInfo_get_length(resp_info));
+            "Invalid response length");
 
     stats->timestamp = (uint64_t) seL4_GetMR(0);
     stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
     stats->entries_logged = (uint32_t) seL4_GetMR(2);
+}
+
+int mmc_rm(void)
+{
+    int ret = 0;
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_RM_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    if(ret == 0)
+    {
+        const seL4_Word cmd_resp = seL4_GetMR(0);
+
+        ret = (int) cmd_resp;
+    }
+
+    return ret;
+}
+
+int mmc_file_size(
+        uint32_t * const size)
+{
+    int ret = 0;
+
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_FILE_SIZE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 2,
+            "Invalid response length");
+
+    if(ret == 0)
+    {
+        const seL4_Word cmd_resp = seL4_GetMR(0);
+        const seL4_Word file_size = seL4_GetMR(1);
+
+        ret = (int) cmd_resp;
+
+        if(ret == 0)
+        {
+            *size = (uint32_t) file_size;
+        }
+        else
+        {
+            *size = 0;
+        }
+    }
+
+    return ret;
 }
