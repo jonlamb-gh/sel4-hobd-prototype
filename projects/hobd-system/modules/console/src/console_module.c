@@ -123,8 +123,8 @@ static void print_help(void)
 static void print_version(void)
 {
     console_println("version information");
-    console_println("  hobd-system: V TODO");
-    console_print("\n");
+    console_println("  branch: " GIT_BRANCH);
+    console_println("  revision: " GIT_REVISION);
 }
 
 static void clear_console(void)
