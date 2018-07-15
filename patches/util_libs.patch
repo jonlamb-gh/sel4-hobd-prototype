@@ -1,3 +1,17 @@
+diff --git a/libplatsupport/src/mach/imx/epit.c b/libplatsupport/src/mach/imx/epit.c
+index 893c42c..2c85696 100644
+--- a/libplatsupport/src/mach/imx/epit.c
++++ b/libplatsupport/src/mach/imx/epit.c
+@@ -113,7 +113,8 @@ int epit_set_timeout_ticks(epit_t *epit, uint64_t counterValue, bool periodic)
+     if (counterValue >= (1ULL << 32)) {
+         ZF_LOGW("counterValue too high\n");
+         /* Counter too large to be stored in 32 bits. */
+-        return EINVAL;
++        //return EINVAL;
++        return ETIME;
+     }
+ 
+     /* configure it and turn it on */
 diff --git a/libplatsupport/src/plat/imx6/mux.c b/libplatsupport/src/plat/imx6/mux.c
 index fe8e384..da3b708 100644
 --- a/libplatsupport/src/plat/imx6/mux.c

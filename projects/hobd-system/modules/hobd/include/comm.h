@@ -27,6 +27,7 @@ typedef enum
 
 typedef struct
 {
+    uint8_t enabled;
     comm_state_kind state;
     uint32_t timeout_id;
     volatile seL4_Word timeout_signaled;

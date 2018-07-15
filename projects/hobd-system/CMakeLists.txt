@@ -18,6 +18,20 @@ ApplyCommonSimulationSettings()
 
 ApplyData61ElfLoaderSettings()
 
+execute_process(
+  COMMAND git rev-parse --abbrev-ref HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_BRANCH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+execute_process(
+  COMMAND git describe
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_REVISION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 add_executable(
     hobd-system
     modules/time_server/src/time_server_module.c
@@ -32,6 +46,11 @@ add_executable(
     src/root_task.c
     src/thread.c
     src/main.c)
+
+add_definitions("-DGIT_REVISION=\"${GIT_REVISION}\"")
+add_definitions("-DGIT_BRANCH=\"${GIT_BRANCH}\"")
+
+include_directories(${CMAKE_BINARY_DIR}/generated)
 
 add_config_library(
     hobd-system

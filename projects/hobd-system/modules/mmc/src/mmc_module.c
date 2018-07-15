@@ -481,7 +481,7 @@ void mmc_log_entry_data(
     }
 }
 
-void mmc_request_stats(
+void mmc_get_stats(
         mmc_stats_s * const stats)
 {
     ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
@@ -531,7 +531,7 @@ int mmc_rm(void)
     return ret;
 }
 
-int mmc_file_size(
+int mmc_get_file_size(
         uint32_t * const size)
 {
     int ret = 0;

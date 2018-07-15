@@ -123,8 +123,8 @@ static void print_help(void)
 static void print_version(void)
 {
     console_println("version information");
-    console_println("  hobd-system: V TODO");
-    console_print("\n");
+    console_println("  branch: " GIT_BRANCH);
+    console_println("  revision: " GIT_REVISION);
 }
 
 static void clear_console(void)
@@ -136,6 +136,7 @@ static void clear_console(void)
     console_print("\033[H");
 }
 
+/* TODO - clean this up, move somewhere else */
 static void handle_cli_cmd(
         const cli_cmd_kind cmd)
 {
@@ -183,7 +184,7 @@ static void handle_cli_cmd(
         console_println("Statistics and Metrics");
 
         mmc_stats_s mmc_stats;
-        mmc_request_stats(&mmc_stats);
+        mmc_get_stats(&mmc_stats);
 
         console_println("MMC");
         console_print("  timestamp: ");
@@ -194,7 +195,7 @@ static void handle_cli_cmd(
         console_println(str);
 
         hobd_stats_s hobd_stats;
-        hobd_request_stats(&hobd_stats);
+        hobd_get_stats(&hobd_stats);
 
         console_println("HOBD");
         console_print("  timestamp: ");
@@ -212,13 +213,16 @@ static void handle_cli_cmd(
         console_print("  comm_init_retry_count: ");
         (void) snprintf(str, sizeof(str), "%u", hobd_stats.comm_init_retry_count);
         console_println(str);
+        console_print("  comm_enabled: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_get_comm_state());
+        console_println(str);
     }
     else if(cmd == CLI_CMD_MMC_FILE_SIZE)
     {
         uint32_t file_size;
         char str[32];
 
-        const int status = mmc_file_size(&file_size);
+        const int status = mmc_get_file_size(&file_size);
 
         if(status == 0)
         {
@@ -244,6 +248,29 @@ static void handle_cli_cmd(
         {
             console_println("Failed to delete the MMC file");
         }
+    }
+    else if(cmd == CLI_CMD_DEBUG_SCHEDULER)
+    {
+#ifdef CONFIG_DEBUG_BUILD
+        console_println("Dumping scheduler (only core 0 TCBs will be displayed?)");
+        console_print("\n");
+        seL4_DebugDumpScheduler();
+        console_print("\n");
+#else
+        console_println("Must be a debug build to do so");
+#endif
+    }
+    else if(cmd == CLI_CMD_HOBD_COMM_OFF)
+    {
+        console_println("Disabling HOBD comms");
+
+        (void) hobd_set_comm_state(0);
+    }
+    else if(cmd == CLI_CMD_HOBD_COMM_ON)
+    {
+        console_println("Enabling HOBD comms");
+
+        (void) hobd_set_comm_state(1);
     }
     else
     {
