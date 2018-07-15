@@ -248,10 +248,8 @@ static void handle_cli_cmd(
     }
     else if(cmd == CLI_CMD_DEBUG_SCHEDULER)
     {
-        /* could make a debug routine to walk each core and call dump? */
-        console_println("Dumping scheduler (only core 0 TCBs will be displayed)");
-
 #ifdef CONFIG_DEBUG_BUILD
+        console_println("Dumping scheduler (only core 0 TCBs will be displayed?)");
         console_print("\n");
         seL4_DebugDumpScheduler();
         console_print("\n");

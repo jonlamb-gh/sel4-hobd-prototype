@@ -48,6 +48,7 @@ int main(
         int argc,
         char **argv)
 {
+    int err;
     init_env_s env = {0};
 
     /* initialize the root task */
@@ -64,11 +65,16 @@ int main(
     hobd_module_init(&env);
     system_module_init(&env);
 
-    const int err = seL4_TCB_SetPriority(
+    err = seL4_TCB_SetPriority(
             seL4_CapInitThreadTCB,
             seL4_CapInitThreadTCB,
             ROOT_THREAD_PRIORITY);
     ZF_LOGF_IF(err != 0, "Failed to set root thread priority");
+
+    err = seL4_TCB_SetAffinity(
+            seL4_CapInitThreadTCB,
+            ROOT_THREAD_AFFINITY);
+    ZF_LOGF_IF(err != 0, "Failed to set root thread's affinity");
 
     /* loop forever, servicing events/faults/etc */
     while(1)
