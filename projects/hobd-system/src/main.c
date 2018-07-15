@@ -76,12 +76,6 @@ int main(
             ROOT_THREAD_AFFINITY);
     ZF_LOGF_IF(err != 0, "Failed to set root thread's affinity");
 
-    const int err = seL4_TCB_SetPriority(
-            seL4_CapInitThreadTCB,
-            seL4_CapInitThreadTCB,
-            ROOT_THREAD_PRIORITY);
-    ZF_LOGF_IF(err != 0, "Failed to set root thread priority");
-
     /* loop forever, servicing events/faults/etc */
     while(1)
     {
