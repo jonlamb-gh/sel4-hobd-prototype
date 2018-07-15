@@ -136,6 +136,7 @@ static void clear_console(void)
     console_print("\033[H");
 }
 
+/* TODO - clean this up, move somewhere else */
 static void handle_cli_cmd(
         const cli_cmd_kind cmd)
 {
@@ -244,6 +245,19 @@ static void handle_cli_cmd(
         {
             console_println("Failed to delete the MMC file");
         }
+    }
+    else if(cmd == CLI_CMD_DEBUG_SCHEDULER)
+    {
+        /* could make a debug routine to walk each core and call dump? */
+        console_println("Dumping scheduler (only core 0 TCBs will be displayed)");
+
+#ifdef CONFIG_DEBUG_BUILD
+        console_print("\n");
+        seL4_DebugDumpScheduler();
+        console_print("\n");
+#else
+        console_println("Must be a debug build to do so");
+#endif
     }
     else
     {

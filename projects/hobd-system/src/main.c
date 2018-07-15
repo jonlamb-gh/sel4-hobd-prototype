@@ -44,20 +44,6 @@
 
 static char g_mem_pool[MEM_POOL_SIZE];
 
-/* TODO - move to some debug file */
-static void debug_dump_scheduler(void)
-{
-#ifdef CONFIG_DEBUG_BUILD
-    ps_mdelay(100);
-
-    /* could make a debug routine to walk each core and call dump? */
-    ZF_LOGD("Dumping scheduler (only core 0 TCBs will be displayed)");
-    printf("\n");
-    seL4_DebugDumpScheduler();
-    printf("\n");
-#endif
-}
-
 int main(
         int argc,
         char **argv)
@@ -77,8 +63,6 @@ int main(
     console_module_init(&env);
     hobd_module_init(&env);
     system_module_init(&env);
-
-    debug_dump_scheduler();
 
     const int err = seL4_TCB_SetPriority(
             seL4_CapInitThreadTCB,
@@ -108,8 +92,6 @@ int main(
                 NULL,
                 NULL,
                 1);
-
-        debug_dump_scheduler();
     }
 
     /* should not get here, intentional halt */
