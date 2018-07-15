@@ -22,7 +22,9 @@ typedef enum
     CLI_CMD_MMC_FILE_SIZE,
     CLI_CMD_MMC_RM,
     CLI_CMD_DEBUG_SCHEDULER,
-    CLI_CMD_KIND_COUNT,
+    CLI_CMD_HOBD_COMM_OFF,
+    CLI_CMD_HOBD_COMM_ON,
+    CLI_CMD_KIND_COUNT
 } cli_cmd_kind;
 
 typedef struct

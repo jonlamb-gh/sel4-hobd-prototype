@@ -32,15 +32,15 @@ void mmc_log_entry_data(
         const uint8_t * const data,
         const uint32_t nonblocking);
 
-/* blocking */
-void mmc_request_stats(
+/* these are all blocking, they use seL4_Call() */
+void mmc_get_stats(
         mmc_stats_s * const stats);
 
 /* 0 = success */
 int mmc_rm(void);
 
 /* 0 = success */
-int mmc_file_size(
+int mmc_get_file_size(
         uint32_t * const size);
 
 #endif /* MMC_H */

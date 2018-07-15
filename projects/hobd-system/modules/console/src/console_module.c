@@ -184,7 +184,7 @@ static void handle_cli_cmd(
         console_println("Statistics and Metrics");
 
         mmc_stats_s mmc_stats;
-        mmc_request_stats(&mmc_stats);
+        mmc_get_stats(&mmc_stats);
 
         console_println("MMC");
         console_print("  timestamp: ");
@@ -195,7 +195,7 @@ static void handle_cli_cmd(
         console_println(str);
 
         hobd_stats_s hobd_stats;
-        hobd_request_stats(&hobd_stats);
+        hobd_get_stats(&hobd_stats);
 
         console_println("HOBD");
         console_print("  timestamp: ");
@@ -213,13 +213,16 @@ static void handle_cli_cmd(
         console_print("  comm_init_retry_count: ");
         (void) snprintf(str, sizeof(str), "%u", hobd_stats.comm_init_retry_count);
         console_println(str);
+        console_print("  comm_enabled: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_get_comm_state());
+        console_println(str);
     }
     else if(cmd == CLI_CMD_MMC_FILE_SIZE)
     {
         uint32_t file_size;
         char str[32];
 
-        const int status = mmc_file_size(&file_size);
+        const int status = mmc_get_file_size(&file_size);
 
         if(status == 0)
         {
@@ -256,6 +259,18 @@ static void handle_cli_cmd(
 #else
         console_println("Must be a debug build to do so");
 #endif
+    }
+    else if(cmd == CLI_CMD_HOBD_COMM_OFF)
+    {
+        console_println("Disabling HOBD comms");
+
+        (void) hobd_set_comm_state(0);
+    }
+    else if(cmd == CLI_CMD_HOBD_COMM_ON)
+    {
+        console_println("Enabling HOBD comms");
+
+        (void) hobd_set_comm_state(1);
     }
     else
     {
