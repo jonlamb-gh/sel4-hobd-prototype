@@ -43,7 +43,7 @@ static const cli_cmd_desc_s CMD_DESCRIPTORS[] =
     [CLI_CMD_HOBD_COMM_STATE] =
         {"hobd-comm", "      - toggle HOBD comm enabled state"},
     [CLI_CMD_HOBD_COMM_LISTEN_ONLY] =
-        {"hobd-lo", "        - toggle HOBD comm listen-only mode"}
+        {"hobd-listen", "    - toggle HOBD comm listen-only mode"}
 };
 
 const cli_cmd_desc_s *cli_get_cmd_desc(

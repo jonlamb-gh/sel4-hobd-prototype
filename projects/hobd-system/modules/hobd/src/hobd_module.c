@@ -464,6 +464,7 @@ void hobd_module_init(
 {
     /* TODO - init_comm */
     g_comm.enabled = 0;
+    g_comm.listen_only = 1;
 
     init_gpio(env);
     init_uart(env);

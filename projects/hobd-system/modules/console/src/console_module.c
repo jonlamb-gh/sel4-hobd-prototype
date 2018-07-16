@@ -107,7 +107,7 @@ static int console_exec(
 /* microrl API */
 static void console_sigint_handler(void)
 {
-    console_println("caught SIGINT");
+    /* TODO */
 }
 
 static void print_help(void)
