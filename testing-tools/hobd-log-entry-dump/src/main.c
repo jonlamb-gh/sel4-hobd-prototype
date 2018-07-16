@@ -148,6 +148,9 @@ static void print_hobd_msg(
             printf("        table-subgroup\n");
             printf("        table: 0x%02lX\n", (unsigned long) resp->table);
             printf("        offset: 0x%02lX\n", (unsigned long) resp->offset);
+            printf(
+                    "        count: %lu\n",
+                    (unsigned long) (msg->header.size - HOBD_MSG_HEADERCS_SIZE - sizeof(*resp)));
         }
         else if(msg->header.subtype == HOBD_MSG_SUBTYPE_INIT)
         {
