@@ -75,15 +75,21 @@ void comm_gpio_init_seq(
 {
     int err;
 
-    /* pull k-line low for 70 ms */
-    err = gpio_clr(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO");
+    if(comm->listen_only == 0)
+    {
+        /* pull k-line low for 70 ms */
+        err = gpio_clr(gpio);
+        ZF_LOGF_IF(err != 0, "Failed to clear k-line GPIO");
+    }
 
     ps_mdelay(70);
 
-    /* return to high, wait 120 ms */
-    err = gpio_set(gpio);
-    ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO");
+    if(comm->listen_only == 0)
+    {
+        /* return to high, wait 120 ms */
+        err = gpio_set(gpio);
+        ZF_LOGF_IF(err != 0, "Failed to set k-line GPIO");
+    }
 
     ps_mdelay(120);
 }
