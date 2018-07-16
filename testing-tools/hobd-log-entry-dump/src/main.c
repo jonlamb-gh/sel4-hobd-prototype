@@ -117,6 +117,47 @@ static void print_hobd_msg(
     printf("    type: 0x%02lX\n", (unsigned long) msg->header.type);
     printf("    size: %lu bytes\n", (unsigned long) msg->header.size);
     printf("    subtype: 0x%02lX\n", (unsigned long) msg->header.subtype);
+    printf(
+            "    checksum: 0x%02lX\n",
+            (unsigned long) msg->data[msg->header.size - HOBD_MSG_HEADERCS_SIZE]);
+
+    if(msg->header.type == HOBD_MSG_TYPE_QUERY)
+    {
+        printf("      -> query\n");
+
+        if(msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
+        {
+            const hobd_data_table_query_s * query =
+                    (const hobd_data_table_query_s*) &msg->data[0];
+
+            printf("        table-subgroup\n");
+            printf("        table: 0x%02lX\n", (unsigned long) query->table);
+            printf("        offset: 0x%02lX\n", (unsigned long) query->offset);
+            printf("        count: %lu\n", (unsigned long) query->count);
+        }
+    }
+    else if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+    {
+        printf("      <- response\n");
+
+        if(msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
+        {
+            const hobd_data_table_response_s * resp =
+                    (const hobd_data_table_response_s*) &msg->data[0];
+
+            printf("        table-subgroup\n");
+            printf("        table: 0x%02lX\n", (unsigned long) resp->table);
+            printf("        offset: 0x%02lX\n", (unsigned long) resp->offset);
+        }
+        else if(msg->header.subtype == HOBD_MSG_SUBTYPE_INIT)
+        {
+            printf("        init\n");
+        }
+    }
+    else if(msg->header.type == HOBD_MSG_TYPE_WAKE_UP)
+    {
+        printf("      -> wake-up\n");
+    }
 }
 
 static void print_entry(

@@ -40,10 +40,10 @@ static const cli_cmd_desc_s CMD_DESCRIPTORS[] =
         {"mmc-rm", "         - delete the current MMC file"},
     [CLI_CMD_DEBUG_SCHEDULER] =
         {"debug-sched", "    - print the kernel scheduler information"},
-    [CLI_CMD_HOBD_COMM_OFF] =
-        {"hobd-comm-off", "  - disable HOBD comms"},
-    [CLI_CMD_HOBD_COMM_ON] =
-        {"hobd-comm-on", "   - enable HOBD comms"}
+    [CLI_CMD_HOBD_COMM_STATE] =
+        {"hobd-comm", "      - toggle HOBD comm enabled state"},
+    [CLI_CMD_HOBD_COMM_LISTEN_ONLY] =
+        {"hobd-lo", "        - toggle HOBD comm listen-only mode"}
 };
 
 const cli_cmd_desc_s *cli_get_cmd_desc(

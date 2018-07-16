@@ -20,6 +20,7 @@
 #include <sel4utils/sel4_zf_logif.h>
 
 #include "config.h"
+#include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
@@ -32,6 +33,8 @@
 #endif
 
 #define MAX_TIMEOUTS (2)
+
+#define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(TMSERVERMOD_BASE_BADGE)
 
 /* TODO - which things should be in the init_env? */
 
@@ -139,7 +142,7 @@ void time_server_module_init(
     /* create a worker thread */
     thread_create(
             TMSERVERMOD_THREAD_NAME,
-            TMSERVERMOD_EP_BADGE,
+            ENDPOINT_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &time_server_thread_fn,

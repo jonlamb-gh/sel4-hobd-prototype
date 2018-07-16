@@ -2,9 +2,6 @@
  * @file mmc_module.c
  * @brief TODO.
  *
- * TODO:
- * - param for non-blocking send?
- *
  */
 
 #include <stdio.h>
@@ -23,8 +20,10 @@
 #include <fat/fat_filelib.h>
 
 #include "config.h"
+#include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
+#include "sel4_mr.h"
 #include "time_server.h"
 #include "mmc_entry.h"
 #include "mmc.h"
@@ -41,13 +40,15 @@
 #define FATIO_MEDIA_RW_FAILURE (0)
 #define FATIO_MEDIA_RW_SUCCESS (1)
 
-#define IPC_MSG_TYPE_ENTRY_LOG (0x2401)
-#define IPC_MSG_TYPE_STATS_REQ (0x2402)
-#define IPC_MSG_TYPE_STATS_RESP (0x2403)
-#define IPC_MSG_TYPE_CMD_RM (0x2404)
-#define IPC_MSG_TYPE_CMD_RM_RESP (0x2405)
-#define IPC_MSG_TYPE_CMD_FILE_SIZE (0x2406)
-#define IPC_MSG_TYPE_CMD_FILE_SIZE_RESP (0x2407)
+#define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(MMCMOD_BASE_BADGE)
+
+#define IPC_MSG_TYPE_ENTRY_LOG IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 1)
+#define IPC_MSG_TYPE_STATS_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 2)
+#define IPC_MSG_TYPE_STATS_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 3)
+#define IPC_MSG_TYPE_RM_FILE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 4)
+#define IPC_MSG_TYPE_RM_FILE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 5)
+#define IPC_MSG_TYPE_FILE_SIZE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 6)
+#define IPC_MSG_TYPE_FILE_SIZE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 7)
 
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
@@ -249,7 +250,7 @@ static void mmc_thread_fn(
                 ep_cap,
                 &badge);
 
-        ZF_LOGF_IF(badge != (MMCMOD_EP_BADGE + 1), "Invalid IPC badge");
+        ZF_LOGF_IF(badge != ENDPOINT_BADGE, "Invalid IPC badge");
 
         const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
 
@@ -257,16 +258,16 @@ static void mmc_thread_fn(
         {
             time_server_get_time(&stats.timestamp);
 
+            const uint32_t resp_size_words = sizeof(stats) / sizeof(seL4_Word);
+
             const seL4_MessageInfo_t resp_info =
                     seL4_MessageInfo_new(
                         IPC_MSG_TYPE_STATS_RESP,
                         0,
                         0,
-                        sizeof(stats) / sizeof(seL4_Word));
+                        resp_size_words);
 
-            seL4_SetMR(0, (seL4_Word) stats.timestamp);
-            seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
-            seL4_SetMR(2, (seL4_Word) stats.entries_logged);
+            sel4_mr_send(resp_size_words, (uint32_t*) &stats, g_thread.ipc_buffer);
 
             seL4_Reply(resp_info);
         }
@@ -274,11 +275,7 @@ static void mmc_thread_fn(
         {
             const seL4_Word total_size_words = seL4_MessageInfo_get_length(info);
 
-            /* reuse badge as index , this is probably unnecessary */
-            for(badge = 0; badge < total_size_words; badge += 1)
-            {
-                g_msg_rx_buffer[badge] = seL4_GetMR(badge);
-            }
+            sel4_mr_recv(g_thread.ipc_buffer, total_size_words, (uint32_t*) &g_msg_rx_buffer[0]);
 
             const mmc_entry_s * const entry =
                     (const mmc_entry_s*) &g_msg_rx_buffer[0];
@@ -290,7 +287,7 @@ static void mmc_thread_fn(
 
             stats.entries_logged += 1;
         }
-        else if(msg_label == IPC_MSG_TYPE_CMD_FILE_SIZE)
+        else if(msg_label == IPC_MSG_TYPE_FILE_SIZE_REQ)
         {
             uint32_t file_size = 0;
             uint32_t cmd_status = 0;
@@ -310,14 +307,14 @@ static void mmc_thread_fn(
 #endif
 
             const seL4_MessageInfo_t resp_info =
-                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE_RESP, 0, 0, 2);
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_FILE_SIZE_RESP, 0, 0, 2);
 
             seL4_SetMR(0, (seL4_Word) cmd_status);
             seL4_SetMR(1, (seL4_Word) file_size);
 
             seL4_Reply(resp_info);
         }
-        else if(msg_label == IPC_MSG_TYPE_CMD_RM)
+        else if(msg_label == IPC_MSG_TYPE_RM_FILE_REQ)
         {
             uint32_t cmd_status = 0;
 
@@ -338,7 +335,7 @@ static void mmc_thread_fn(
 #endif
 
             const seL4_MessageInfo_t resp_info =
-                    seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM_RESP, 0, 0, 1);
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_RM_FILE_RESP, 0, 0, 1);
 
             seL4_SetMR(0, (seL4_Word) cmd_status);
 
@@ -397,7 +394,7 @@ void mmc_module_init(
     /* create a worker thread */
     thread_create(
             MMCMOD_THREAD_NAME,
-            MMCMOD_EP_BADGE,
+            ENDPOINT_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &mmc_thread_fn,
@@ -468,7 +465,16 @@ void mmc_log_entry_data(
             }
         }
 
-        seL4_SetMR(3 + idx, data_word);
+        /* TODO - what am I doing wrong here to require this? */
+        /* use R3, then remaining go into the IPC buffer msg array */
+        if(idx == 0)
+        {
+            seL4_SetMR(3 + idx, data_word);
+        }
+        else
+        {
+            g_thread.ipc_buffer->msg[3 + idx] = data_word;
+        }
     }
 
     if(nonblocking == 0)
@@ -495,13 +501,13 @@ void mmc_get_stats(
             seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
             "Invalid response lable");
 
+    const uint32_t resp_size_words = sizeof(*stats) / sizeof(seL4_Word);
+
     ZF_LOGF_IF(
-            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
+            (seL4_MessageInfo_get_length(resp_info) != resp_size_words),
             "Invalid response length");
 
-    stats->timestamp = (uint64_t) seL4_GetMR(0);
-    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
-    stats->entries_logged = (uint32_t) seL4_GetMR(2);
+    sel4_mr_recv(g_thread.ipc_buffer, resp_size_words, (uint32_t*) stats);
 }
 
 int mmc_rm(void)
@@ -509,12 +515,12 @@ int mmc_rm(void)
     int ret = 0;
 
     const seL4_MessageInfo_t req_info =
-            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_RM, 0, 0, 0);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_RM_FILE_REQ, 0, 0, 0);
 
     const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
 
     ZF_LOGF_IF(
-            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_RM_RESP,
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_RM_FILE_RESP,
             "Invalid response lable");
 
     ZF_LOGF_IF(
@@ -537,12 +543,12 @@ int mmc_get_file_size(
     int ret = 0;
 
     const seL4_MessageInfo_t req_info =
-            seL4_MessageInfo_new(IPC_MSG_TYPE_CMD_FILE_SIZE, 0, 0, 0);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_FILE_SIZE_REQ, 0, 0, 0);
 
     const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
 
     ZF_LOGF_IF(
-            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_CMD_FILE_SIZE_RESP,
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_FILE_SIZE_RESP,
             "Invalid response lable");
 
     ZF_LOGF_IF(

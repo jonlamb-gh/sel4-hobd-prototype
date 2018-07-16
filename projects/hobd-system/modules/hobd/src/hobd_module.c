@@ -20,9 +20,11 @@
 #include <sel4utils/sel4_zf_logif.h>
 
 #include "config.h"
+#include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
+#include "sel4_mr.h"
 #include "mmc_entry.h"
 #include "mmc.h"
 #include "system_module.h"
@@ -39,11 +41,16 @@
 #define MODLOGD(...)
 #endif
 
-#define IPC_MSG_TYPE_STATS_REQ (0x2301)
-#define IPC_MSG_TYPE_STATS_RESP (0x2302)
-#define IPC_MSG_TYPE_GET_COMM_STATE (0x2303)
-#define IPC_MSG_TYPE_SET_COMM_STATE (0x2304)
-#define IPC_MSG_TYPE_COMM_STATE_RESP (0x2305)
+#define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(HOBDMOD_BASE_BADGE)
+
+#define IPC_MSG_TYPE_STATS_REQ IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 1)
+#define IPC_MSG_TYPE_STATS_RESP IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 2)
+#define IPC_MSG_TYPE_COMM_STATE_REQ IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 3)
+#define IPC_MSG_TYPE_COMM_STATE_SET_REQ IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 4)
+#define IPC_MSG_TYPE_COMM_STATE_RESP IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 5)
+#define IPC_MSG_TYPE_LISTEN_ONLY_REQ IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 6)
+#define IPC_MSG_TYPE_LISTEN_ONLY_SET_REQ IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 7)
+#define IPC_MSG_TYPE_LISTEN_ONLY_RESP IPC_MSG_TYPE_ID(HOBDMOD_BASE_BADGE, 8)
 
 /* see 36.4 IOMUXC of TRM */
 /* SD3_DAT7 - UART1_TX_DATA - GPIO6_IO17 - SW_PAD_CTL_PAD_SD3_DATA7 */
@@ -93,12 +100,15 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 
     /* TESTING - log tx messages */
-    mmc_log_entry_data(
-            MMC_ENTRY_TYPE_HOBD_MSG,
-            HOBD_MSG_HEADERCS_SIZE,
-            NULL,
-            &g_msg_tx_buffer[0],
-            0);
+    if(g_comm.listen_only == 0)
+    {
+        mmc_log_entry_data(
+                MMC_ENTRY_TYPE_HOBD_MSG,
+                HOBD_MSG_HEADERCS_SIZE,
+                NULL,
+                &g_msg_tx_buffer[0],
+                0);
+    }
 
     ps_mdelay(1);
 
@@ -113,12 +123,15 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 
     /* TESTING - log tx messages */
-    mmc_log_entry_data(
-            MMC_ENTRY_TYPE_HOBD_MSG,
-            HOBD_MSG_HEADERCS_SIZE + 1,
-            NULL,
-            &g_msg_tx_buffer[0],
-            0);
+    if(g_comm.listen_only == 0)
+    {
+        mmc_log_entry_data(
+                MMC_ENTRY_TYPE_HOBD_MSG,
+                HOBD_MSG_HEADERCS_SIZE + 1,
+                NULL,
+                &g_msg_tx_buffer[0],
+                0);
+    }
 }
 
 static void send_table_req(
@@ -142,12 +155,15 @@ static void send_table_req(
     comm_send_msg(tx_msg, &g_comm);
 
     /* TESTING - log tx messages */
-    mmc_log_entry_data(
-            MMC_ENTRY_TYPE_HOBD_MSG,
-            (uint16_t) tx_msg->header.size,
-            NULL,
-            (const uint8_t*) tx_msg,
-            0);
+    if(g_comm.listen_only == 0)
+    {
+        mmc_log_entry_data(
+                MMC_ENTRY_TYPE_HOBD_MSG,
+                (uint16_t) tx_msg->header.size,
+                NULL,
+                (const uint8_t*) tx_msg,
+                0);
+    }
 }
 
 static void comm_update_state(
@@ -310,7 +326,7 @@ static void obd_comm_thread_fn(
 
         if((badge != 0) && (msg_label != 0))
         {
-            ZF_LOGF_IF(badge != (HOBDMOD_EP_BADGE + 1), "Invalid IPC badge %u", badge);
+            ZF_LOGF_IF(badge != ENDPOINT_BADGE, "Invalid IPC badge %u", badge);
 
             if(msg_label == IPC_MSG_TYPE_STATS_REQ)
             {
@@ -319,27 +335,20 @@ static void obd_comm_thread_fn(
                 stats.valid_rx_count = g_msg_parser.valid_count;
                 stats.invalid_rx_count = g_msg_parser.invalid_count;
 
+                const uint32_t resp_size_words = sizeof(stats) / sizeof(seL4_Word);
+
                 const seL4_MessageInfo_t resp_info =
                         seL4_MessageInfo_new(
                             IPC_MSG_TYPE_STATS_RESP,
                             0,
                             0,
-                            sizeof(stats) / sizeof(seL4_Word));
+                            resp_size_words);
 
-                seL4_SetMR(0, (seL4_Word) stats.timestamp);
-                seL4_SetMR(1, (seL4_Word) (stats.timestamp >> 32));
-                seL4_SetMR(
-                        2,
-                        ((seL4_Word) stats.valid_rx_count)
-                        | ((seL4_Word) stats.invalid_rx_count << 16));
-                seL4_SetMR(
-                        3,
-                        ((seL4_Word) stats.comm_gpio_retry_count)
-                        | ((seL4_Word) stats.comm_init_retry_count << 16));
+                sel4_mr_send(resp_size_words, (uint32_t*) &stats, g_thread.ipc_buffer);
 
                 seL4_Reply(resp_info);
             }
-            else if(msg_label == IPC_MSG_TYPE_GET_COMM_STATE)
+            else if(msg_label == IPC_MSG_TYPE_COMM_STATE_REQ)
             {
                 const seL4_MessageInfo_t resp_info =
                         seL4_MessageInfo_new(
@@ -351,7 +360,7 @@ static void obd_comm_thread_fn(
                 seL4_SetMR(0, (seL4_Word) g_comm.enabled);
                 seL4_Reply(resp_info);
             }
-            else if(msg_label == IPC_MSG_TYPE_SET_COMM_STATE)
+            else if(msg_label == IPC_MSG_TYPE_COMM_STATE_SET_REQ)
             {
                 const seL4_MessageInfo_t resp_info =
                         seL4_MessageInfo_new(
@@ -372,6 +381,41 @@ static void obd_comm_thread_fn(
                 }
 
                 seL4_SetMR(0, (seL4_Word) g_comm.enabled);
+                seL4_Reply(resp_info);
+            }
+            else if(msg_label == IPC_MSG_TYPE_LISTEN_ONLY_REQ)
+            {
+                const seL4_MessageInfo_t resp_info =
+                        seL4_MessageInfo_new(
+                            IPC_MSG_TYPE_LISTEN_ONLY_RESP,
+                            0,
+                            0,
+                            1);
+
+                seL4_SetMR(0, (seL4_Word) g_comm.listen_only);
+                seL4_Reply(resp_info);
+            }
+            else if(msg_label == IPC_MSG_TYPE_LISTEN_ONLY_SET_REQ)
+            {
+                const seL4_MessageInfo_t resp_info =
+                        seL4_MessageInfo_new(
+                            IPC_MSG_TYPE_LISTEN_ONLY_RESP,
+                            0,
+                            0,
+                            1);
+
+                const uint32_t desired_state = seL4_GetMR(0);
+
+                if(desired_state == 0)
+                {
+                    g_comm.listen_only = 0;
+                }
+                else
+                {
+                    g_comm.listen_only = 1;
+                }
+
+                seL4_SetMR(0, (seL4_Word) g_comm.listen_only);
                 seL4_Reply(resp_info);
             }
             else
@@ -427,7 +471,7 @@ void hobd_module_init(
     /* create a worker thread */
     thread_create(
             HOBDMOD_THREAD_NAME,
-            HOBDMOD_EP_BADGE,
+            ENDPOINT_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &obd_comm_thread_fn,
@@ -447,7 +491,7 @@ void hobd_module_init(
 void hobd_get_stats(
         hobd_stats_s * const stats)
 {
-    ZF_LOGF_IF(sizeof(stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
+    ZF_LOGF_IF(sizeof(*stats) % sizeof(seL4_Word) != 0, "Stats struct not properly aligned");
 
     const seL4_MessageInfo_t req_info =
             seL4_MessageInfo_new(IPC_MSG_TYPE_STATS_REQ, 0, 0, 0);
@@ -458,24 +502,20 @@ void hobd_get_stats(
             seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATS_RESP,
             "Invalid response lable");
 
-    ZF_LOGF_IF(
-            (seL4_MessageInfo_get_length(resp_info) * sizeof(seL4_Word)) != sizeof(*stats),
-            "Invalid response length of %u words",
-            seL4_MessageInfo_get_length(resp_info));
+    const uint32_t resp_size_words = sizeof(*stats) / sizeof(seL4_Word);
 
-    stats->timestamp = (uint64_t) seL4_GetMR(0);
-    stats->timestamp |= ((uint64_t) seL4_GetMR(1) << 32);
-    stats->valid_rx_count = (uint16_t) (seL4_GetMR(2) & 0xFFFF);
-    stats->invalid_rx_count = (uint16_t) ((seL4_GetMR(2) >> 16) & 0xFFFF);
-    stats->comm_gpio_retry_count = (uint16_t) (seL4_GetMR(3) & 0xFFFF);
-    stats->comm_init_retry_count = (uint16_t) ((seL4_GetMR(3) >> 16) & 0xFFFF);
+    ZF_LOGF_IF(
+            (seL4_MessageInfo_get_length(resp_info) != resp_size_words),
+            "Invalid response length of");
+
+    sel4_mr_recv(g_thread.ipc_buffer, resp_size_words, (uint32_t*) stats);
 }
 
 uint32_t hobd_set_comm_state(
         const uint32_t state)
 {
     const seL4_MessageInfo_t req_info =
-            seL4_MessageInfo_new(IPC_MSG_TYPE_SET_COMM_STATE, 0, 0, 1);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_COMM_STATE_SET_REQ, 0, 0, 1);
 
     seL4_SetMR(0, (seL4_Word) state);
 
@@ -495,12 +535,51 @@ uint32_t hobd_set_comm_state(
 uint32_t hobd_get_comm_state(void)
 {
     const seL4_MessageInfo_t req_info =
-            seL4_MessageInfo_new(IPC_MSG_TYPE_GET_COMM_STATE, 0, 0, 0);
+            seL4_MessageInfo_new(IPC_MSG_TYPE_COMM_STATE_REQ, 0, 0, 0);
 
     const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
 
     ZF_LOGF_IF(
             seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_COMM_STATE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
+}
+
+uint32_t hobd_set_listen_only(
+        const uint32_t state)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_LISTEN_ONLY_SET_REQ, 0, 0, 1);
+
+    seL4_SetMR(0, (seL4_Word) state);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_LISTEN_ONLY_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
+}
+
+uint32_t hobd_get_listen_only(void)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_LISTEN_ONLY_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_LISTEN_ONLY_RESP,
             "Invalid response lable");
 
     ZF_LOGF_IF(

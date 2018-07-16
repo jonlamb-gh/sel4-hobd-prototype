@@ -27,4 +27,9 @@ uint32_t hobd_set_comm_state(
 
 uint32_t hobd_get_comm_state(void);
 
+uint32_t hobd_set_listen_only(
+        const uint32_t state);
+
+uint32_t hobd_get_listen_only(void);
+
 #endif /* HOBD_H */

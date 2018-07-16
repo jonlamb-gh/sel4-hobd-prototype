@@ -15,10 +15,11 @@
 #include <sel4utils/vspace.h>
 #include <sel4utils/mapping.h>
 #include <utils/arith.h>
-//#include <sel4utils/sel4_zf_logif.h>
+#include <sel4utils/sel4_zf_logif.h>
 #include <sel4debug/debug.h>
 
 #include "init_env.h"
+#include "ipc_util.h"
 #include "thread.h"
 
 void thread_create(
@@ -80,7 +81,7 @@ void thread_create(
             thread->ipc_ep.cptr,
             seL4_WordBits,
             seL4_AllRights,
-            ipc_badge + 1);
+            ipc_badge);
     ZF_LOGF_IF(err != 0, "Failed to mint badged IPC endpoint for thread");
 
     /* allocate a cspace slot for the fault endpoint */
@@ -99,7 +100,7 @@ void thread_create(
             env->global_fault_ep,
             seL4_WordBits,
             seL4_AllRights,
-            ipc_badge);
+            IPC_FAULT_ENDPOINT_BADGE(ipc_badge));
     ZF_LOGF_IF(err != 0, "Failed to mint badged fault endpoint for thread");
 
     /* initialise the new TCB */

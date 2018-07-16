@@ -4,7 +4,7 @@ Prototype HOBD system running on the [seL4](https://sel4.systems/) microkernel.
 
 Manages a diagnostic connection to the Honda CBR ECU and logs data to an SD card.
 
-There is a simple console available for interracting with the system.
+There is a simple console available for interacting with the system.
 
 Supported platforms:
 

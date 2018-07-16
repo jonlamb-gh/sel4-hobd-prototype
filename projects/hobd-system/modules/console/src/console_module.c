@@ -24,6 +24,7 @@
 #include "microrl/microrl.h"
 
 #include "config.h"
+#include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
 #include "time_server.h"
@@ -40,6 +41,10 @@
 
 #define CONSOLE_BAUD (115200UL)
 #define CONSOLE_STARTUP_DELAY_MS (1500UL)
+
+#define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(CONSOLEMOD_BASE_BADGE)
+
+#define NOTIFICATION_BADGE IPC_NOTIFICATION_BADGE(CONSOLEMOD_BASE_BADGE)
 
 static microrl_t g_microrl_state;
 
@@ -216,6 +221,9 @@ static void handle_cli_cmd(
         console_print("  comm_enabled: ");
         (void) snprintf(str, sizeof(str), "%u", hobd_get_comm_state());
         console_println(str);
+        console_print("  comm_listen_only: ");
+        (void) snprintf(str, sizeof(str), "%u", hobd_get_listen_only());
+        console_println(str);
     }
     else if(cmd == CLI_CMD_MMC_FILE_SIZE)
     {
@@ -260,17 +268,35 @@ static void handle_cli_cmd(
         console_println("Must be a debug build to do so");
 #endif
     }
-    else if(cmd == CLI_CMD_HOBD_COMM_OFF)
+    else if(cmd == CLI_CMD_HOBD_COMM_STATE)
     {
-        console_println("Disabling HOBD comms");
+        const uint32_t state = hobd_get_comm_state();
 
-        (void) hobd_set_comm_state(0);
+        if(state == 0)
+        {
+            console_println("Enabling HOBD comms");
+        }
+        else
+        {
+            console_println("Disabling HOBD comms");
+        }
+
+        (void) hobd_set_comm_state(!state);
     }
-    else if(cmd == CLI_CMD_HOBD_COMM_ON)
+    else if(cmd == CLI_CMD_HOBD_COMM_LISTEN_ONLY)
     {
-        console_println("Enabling HOBD comms");
+        const uint32_t state = hobd_get_listen_only();
 
-        (void) hobd_set_comm_state(1);
+        if(state == 0)
+        {
+            console_println("Enabling listen-only mode");
+        }
+        else
+        {
+            console_println("Disabling listen-only mode");
+        }
+
+        (void) hobd_set_listen_only(!state);
     }
     else
     {
@@ -310,7 +336,7 @@ static void console_thread_fn(
         /* wait on the IRQ notification */
         seL4_Word mbadge = 0;
         seL4_Wait(g_cdev_ntfn.cptr, &mbadge);
-        ZF_LOGF_IF(mbadge != CONSOLE_NOTIFICATION_BADGE, "Invalid badge 0x%X", mbadge);
+        ZF_LOGF_IF(mbadge != NOTIFICATION_BADGE, "Invalid badge 0x%X", mbadge);
 
         /* ack the IRQ */
         err = seL4_IRQHandler_Ack(g_cdev_irq.handler_path.capPtr);
@@ -374,7 +400,7 @@ static void init_cdev(
             &g_cdev_irq.badged_ntfn_path,
             &path,
             seL4_AllRights,
-            CONSOLE_NOTIFICATION_BADGE);
+            NOTIFICATION_BADGE);
     ZF_LOGF_IF(err != 0, "Failed to badge IRQ notification");
 
     /* set notification acking any pending IRQ to ensure
@@ -397,7 +423,7 @@ void console_module_init(
     /* create a worker thread */
     thread_create(
             CONSOLEMOD_THREAD_NAME,
-            CONSOLEMOD_EP_BADGE,
+            ENDPOINT_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &console_thread_fn,

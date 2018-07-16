@@ -112,18 +112,21 @@ void comm_send_msg(
 {
     uint16_t idx;
 
-    for(idx = 0; idx < msg->header.size; idx += 1)
+    if(comm->listen_only == 0)
     {
-        ps_cdev_putchar(
-                &comm->char_dev,
-                ((uint8_t*) msg)[idx]);
-    }
+        for(idx = 0; idx < msg->header.size; idx += 1)
+        {
+            ps_cdev_putchar(
+                    &comm->char_dev,
+                    ((uint8_t*) msg)[idx]);
+        }
 
-    MODLOGD(
-            "tx_msg[%02X:%02X:%02X]",
-            (unsigned int) msg->header.type,
-            (unsigned int) msg->header.size,
-            (unsigned int) msg->header.subtype);
+        MODLOGD(
+                "tx_msg[%02X:%02X:%02X]",
+                (unsigned int) msg->header.type,
+                (unsigned int) msg->header.size,
+                (unsigned int) msg->header.subtype);
+    }
 }
 
 hobd_msg_s *comm_recv_msg(

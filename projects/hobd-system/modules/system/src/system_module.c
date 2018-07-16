@@ -14,6 +14,7 @@
 #include <platsupport/delay.h>
 
 #include "config.h"
+#include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
 #include "mmc_entry.h"
@@ -27,6 +28,8 @@
 #endif
 
 #define HEARTBEAT_DELAY_SEC (4)
+
+#define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(SYSMOD_BASE_BADGE)
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[SYSMOD_STACK_SIZE];
@@ -91,7 +94,7 @@ void system_module_init(
     /* create the system thread */
     thread_create(
             SYSMOD_THREAD_NAME,
-            SYSMOD_EP_BADGE,
+            ENDPOINT_BADGE,
             (uint32_t) sizeof(g_thread_stack),
             &g_thread_stack[0],
             &sys_thread_fn,
