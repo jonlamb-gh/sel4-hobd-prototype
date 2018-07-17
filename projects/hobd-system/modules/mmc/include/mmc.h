@@ -43,4 +43,9 @@ int mmc_rm(void);
 int mmc_get_file_size(
         uint32_t * const size);
 
+uint32_t mmc_set_state(
+        const uint32_t state);
+
+uint32_t mmc_get_state(void);
+
 #endif /* MMC_H */

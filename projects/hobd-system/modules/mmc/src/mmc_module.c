@@ -50,6 +50,9 @@
 #define IPC_MSG_TYPE_RM_FILE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 5)
 #define IPC_MSG_TYPE_FILE_SIZE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 6)
 #define IPC_MSG_TYPE_FILE_SIZE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 7)
+#define IPC_MSG_TYPE_STATE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 8)
+#define IPC_MSG_TYPE_STATE_SET_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 9)
+#define IPC_MSG_TYPE_STATE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 10)
 
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
@@ -273,7 +276,10 @@ static void mmc_thread_fn(
 
             write_mmc_entry(entry, 0);
 
-            stats.entries_logged += 1;
+            if(g_mmc_file.enabled != 0)
+            {
+                stats.entries_logged += 1;
+            }
         }
         else if(msg_label == IPC_MSG_TYPE_FILE_SIZE_REQ)
         {
@@ -300,6 +306,33 @@ static void mmc_thread_fn(
 
             seL4_SetMR(0, (seL4_Word) cmd_status);
 
+            seL4_Reply(resp_info);
+        }
+        else if(msg_label == IPC_MSG_TYPE_STATE_REQ)
+        {
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_RESP, 0, 0, 1);
+
+            seL4_SetMR(0, (seL4_Word) mmc_file_get_enabled(&g_mmc_file));
+            seL4_Reply(resp_info);
+        }
+        else if(msg_label == IPC_MSG_TYPE_STATE_SET_REQ)
+        {
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_RESP, 0, 0, 1);
+
+            const uint32_t desired_state = seL4_GetMR(0);
+
+            err = mmc_file_set_enabled(desired_state, &g_mmc_file);
+            if(err != 0)
+            {
+                ZF_LOGW(
+                        "Failed to change MMC file enabled state to %u - disabling",
+                        desired_state);
+                (void) mmc_file_set_enabled(0, &g_mmc_file);
+            }
+
+            seL4_SetMR(0, (seL4_Word) mmc_file_get_enabled(&g_mmc_file));
             seL4_Reply(resp_info);
         }
         else
@@ -533,4 +566,43 @@ int mmc_get_file_size(
     }
 
     return ret;
+}
+
+uint32_t mmc_set_state(
+        const uint32_t state)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_SET_REQ, 0, 0, 1);
+
+    seL4_SetMR(0, (seL4_Word) state);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
+}
+
+uint32_t mmc_get_state(void)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
 }

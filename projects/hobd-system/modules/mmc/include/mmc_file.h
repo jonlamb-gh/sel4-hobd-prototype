@@ -32,6 +32,10 @@ void mmc_file_init(
 uint32_t mmc_file_get_enabled(
         const mmc_file_s * const file);
 
+int mmc_file_set_enabled(
+        const uint32_t enabled,
+        mmc_file_s * const file);
+
 int mmc_file_open(
         mmc_file_s * const file);
 

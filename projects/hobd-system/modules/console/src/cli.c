@@ -34,6 +34,8 @@ static const cli_cmd_desc_s CMD_DESCRIPTORS[] =
         {"time", "           - get the current time"},
     [CLI_CMD_STATS] =
         {"stats", "          - print module statistics and metrics"},
+    [CLI_CMD_MMC_STATE] =
+        {"mmc", "            - toggle MMC file enabled state"},
     [CLI_CMD_MMC_FILE_SIZE] =
         {"mmc-size", "       - get current MMC file size"},
     [CLI_CMD_MMC_RM] =

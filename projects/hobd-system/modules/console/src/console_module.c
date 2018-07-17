@@ -198,6 +198,9 @@ static void handle_cli_cmd(
         console_print("  entries_logged: ");
         (void) snprintf(str, sizeof(str), "%u", mmc_stats.entries_logged);
         console_println(str);
+        console_print("  enabled: ");
+        (void) snprintf(str, sizeof(str), "%u", mmc_get_state());
+        console_println(str);
 
         hobd_stats_s hobd_stats;
         hobd_get_stats(&hobd_stats);
@@ -224,6 +227,21 @@ static void handle_cli_cmd(
         console_print("  comm_listen_only: ");
         (void) snprintf(str, sizeof(str), "%u", hobd_get_listen_only());
         console_println(str);
+    }
+    else if(cmd == CLI_CMD_MMC_STATE)
+    {
+        const uint32_t state = mmc_get_state();
+
+        if(state == 0)
+        {
+            console_println("Enabling MMC file");
+        }
+        else
+        {
+            console_println("Disabling MMC file");
+        }
+
+        (void) mmc_set_state(!state);
     }
     else if(cmd == CLI_CMD_MMC_FILE_SIZE)
     {

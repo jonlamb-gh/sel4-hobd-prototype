@@ -135,6 +135,32 @@ uint32_t mmc_file_get_enabled(
     return enabled;
 }
 
+int mmc_file_set_enabled(
+        const uint32_t enabled,
+        mmc_file_s * const file)
+{
+    int ret = init_check(file, DONT_CHECK_FILE);
+
+    if(enabled == 0)
+    {
+        /* disable if not already */
+        if(file->enabled != 0)
+        {
+            file->enabled = 0;
+
+            MODLOGD("Disabling MMC file");
+            mmc_fclose(file);
+        }
+    }
+    else
+    {
+        ZF_LOGF("MMC file enabling not yet implemented");
+        ret = MMC_FILE_ERR_FS;
+    }
+
+    return ret;
+}
+
 int mmc_file_close(
         mmc_file_s * const file)
 {
