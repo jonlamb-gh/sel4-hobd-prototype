@@ -199,13 +199,13 @@ static void log_csv_headers(
 
     fprintf(
             t10_file,
-            "timestamp,engine_rpm,tps_volt,tps_percent,ect_volt,ect_temp,"
-            "iat_volt,iat_temp,map_volt,map_pressure,reserved_0,reserved_1,"
-            "battery_volt,wheel_speed,fuel_injectors\n");
+            "timestamp engine_rpm tps_volt tps_percent ect_volt ect_temp "
+            "iat_volt iat_temp map_volt map_pressure reserved_0 reserved_1 "
+            "battery_volt wheel_speed fuel_injectors\n");
 
     fprintf(
             td1_file,
-            "timestamp,gear,reserved_0,reserved_1,reserved_2,engine_on\n");
+            "timestamp gear reserved_0 reserved_1 reserved_2 engine_on\n");
 }
 
 static void log_csv_table_10(
@@ -215,9 +215,9 @@ static void log_csv_table_10(
 {
     fprintf(
             file,
-            "%llu,%u,%u,%u,%u,%u"
-            "%u,%u,%u,%u,%u,%u"
-            "%u,%u,%u\n",
+            "%llu %u %u %u %u %u"
+            "%u %u %u %u %u %u"
+            "%u %u %u\n",
             timestamp,
             (unsigned int) table->engine_rpm,
             (unsigned int) table->tps_volt,
@@ -242,7 +242,7 @@ static void log_csv_table_d1(
 {
     fprintf(
             file,
-            "%llu,%u,%u,%u,%u,%u\n",
+            "%llu %u %u %u %u %u\n",
             timestamp,
             (unsigned int) table->gear,
             (unsigned int) table->reserved_0,
