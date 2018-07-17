@@ -6,6 +6,7 @@ Plotting of CSV can be done for example:
 
 - online [https://plot.ly/create/](https://plot.ly/create/)
 - terminal [https://github.com/sgreben/jp](https://github.com/sgreben/jp)
+- GUI [https://kst-plot.kde.org/](https://kst-plot.kde.org/)
 
 ```bash
 $ hobd-log-entry-dump hobd.log
