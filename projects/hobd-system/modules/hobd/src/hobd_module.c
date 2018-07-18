@@ -77,9 +77,9 @@ static void log_csv_table_10(
     snprintf(
             &g_csv_buffer[0],
             sizeof(g_csv_buffer),
-            "%llu %u %u %u %u %u"
-            "%u %u %u %u %u %u"
-            "%u %u %u",
+            "%llu,%u,%u,%u,%u,%u,"
+            "%u,%u,%u,%u,%u,%u,"
+            "%u,%u,%u",
             *timestamp,
             (unsigned int) table->engine_rpm,
             (unsigned int) table->tps_volt,
@@ -107,7 +107,7 @@ static void log_csv_table_d1(
     snprintf(
             &g_csv_buffer[0],
             sizeof(g_csv_buffer),
-            "%llu %u %u %u %u %u",
+            "%llu,%u,%u,%u,%u,%u",
             *timestamp,
             (unsigned int) table->gear,
             (unsigned int) table->reserved_0,
