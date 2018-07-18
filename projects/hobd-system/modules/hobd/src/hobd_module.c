@@ -61,6 +61,7 @@
 #define MSG_TX_BUFFER_SIZE (HOBD_MSG_SIZE_MAX + 1)
 
 static comm_s g_comm;
+static char g_csv_buffer[1024];
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
@@ -68,6 +69,55 @@ static uint64_t g_thread_stack[HOBDMOD_STACK_SIZE];
 static hobd_parser_s g_msg_parser;
 static uint8_t g_msg_rx_buffer[MSG_RX_BUFFER_SIZE];
 static uint8_t g_msg_tx_buffer[MSG_TX_BUFFER_SIZE];
+
+static void log_csv_table_10(
+        const hobd_table_10_s * const table,
+        const uint64_t * const timestamp)
+{
+    snprintf(
+            &g_csv_buffer[0],
+            sizeof(g_csv_buffer),
+            "%llu %u %u %u %u %u"
+            "%u %u %u %u %u %u"
+            "%u %u %u",
+            *timestamp,
+            (unsigned int) table->engine_rpm,
+            (unsigned int) table->tps_volt,
+            (unsigned int) table->tps_percent,
+            (unsigned int) table->ect_volt,
+            (unsigned int) table->ect_temp,
+            (unsigned int) table->iat_volt,
+            (unsigned int) table->iat_temp,
+            (unsigned int) table->map_volt,
+            (unsigned int) table->map_pressure,
+            (unsigned int) table->reserved_0,
+            (unsigned int) table->reserved_1,
+            (unsigned int) table->battery_volt,
+            (unsigned int) table->wheel_speed,
+            (unsigned int) table->fuel_injectors);
+
+    /* TODO - fix this, puts adds a newline */
+    puts(g_csv_buffer);
+}
+
+static void log_csv_table_d1(
+        const hobd_table_d1_s * const table,
+        const uint64_t * const timestamp)
+{
+    snprintf(
+            &g_csv_buffer[0],
+            sizeof(g_csv_buffer),
+            "%llu %u %u %u %u %u",
+            *timestamp,
+            (unsigned int) table->gear,
+            (unsigned int) table->reserved_0,
+            (unsigned int) table->reserved_1,
+            (unsigned int) table->reserved_2,
+            (unsigned int) table->engine_on);
+
+    /* TODO - fix this, puts adds a newline */
+    /* puts(g_csv_buffer); */
+}
 
 static void new_hobd_msg_callback(
         const hobd_msg_s * const msg,
@@ -81,8 +131,32 @@ static void new_hobd_msg_callback(
             (const uint8_t*) msg,
             0);
 
-    /* update the data tables with responses */
     /* TODO */
+    /* update the data tables with responses */
+    /* CSV output flag? */
+
+    /* TESTING */
+    if(msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+    {
+        if(msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
+        {
+            const hobd_data_table_response_s * const resp =
+                    (const hobd_data_table_response_s*) &msg->data[0];
+
+            if(resp->table == HOBD_TABLE_10)
+            {
+                log_csv_table_10(
+                        (const hobd_table_10_s*) &resp->data[0],
+                        rx_timestamp);
+            }
+            else if(resp->table == HOBD_TABLE_D1)
+            {
+                log_csv_table_d1(
+                        (const hobd_table_d1_s*) &resp->data[0],
+                        rx_timestamp);
+            }
+        }
+    }
 }
 
 static void send_ecu_diag_messages(void)
@@ -400,6 +474,8 @@ static void obd_comm_thread_fn(
                 {
                     g_comm.enabled = 1;
                 }
+
+                hobd_parser_reset(&g_msg_parser);
 
                 seL4_SetMR(0, (seL4_Word) g_comm.enabled);
                 seL4_Reply(resp_info);
