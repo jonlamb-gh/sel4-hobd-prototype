@@ -16,6 +16,21 @@ $ tree
 └── table_D1.csv
 ```
 
+Plot CSV file with KST:
+
+```bash
+$ kst2 --asciiDelim , --asciiDataStart 2 --asciiFieldNames 1 table_10.csv
+```
+
+Plot CSV data in real-time:
+
+```bash
+$ cat /dev/ttyUSB0 > /tmp/data.csv
+
+# plot the last 1000 frames as new data comes in
+$ kst2 --asciiDelim , --asciiDataStart 2 --asciiFieldNames 1 data.csv -n 1000
+```
+
 ```bash
 [0000]
   type: 0x0020 | HEARTBEAT
