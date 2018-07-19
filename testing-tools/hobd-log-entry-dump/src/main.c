@@ -18,6 +18,9 @@
 
 static const char DEFAULT_FILE_NAME[] = "hobd.log";
 
+static const char DEFAULT_T10_CSV_FILE_NAME[] = "table_10.csv";
+static const char DEFAULT_TD1_CSV_FILE_NAME[] = "table_D1.csv";
+
 static const char * const ENTRY_TYPE_STR_TABLE[] =
 {
     "INVALID",
@@ -148,6 +151,9 @@ static void print_hobd_msg(
             printf("        table-subgroup\n");
             printf("        table: 0x%02lX\n", (unsigned long) resp->table);
             printf("        offset: 0x%02lX\n", (unsigned long) resp->offset);
+            printf(
+                    "        count: %lu\n",
+                    (unsigned long) (msg->header.size - HOBD_MSG_HEADERCS_SIZE - sizeof(*resp)));
         }
         else if(msg->header.subtype == HOBD_MSG_SUBTYPE_INIT)
         {
@@ -184,6 +190,108 @@ static void print_entry(
     (void) fflush(stdout);
 }
 
+static void log_csv_headers(
+        FILE * const t10_file,
+        FILE * const td1_file)
+{
+    assert(t10_file != NULL);
+    assert(td1_file != NULL);
+
+    fprintf(
+            t10_file,
+            "timestamp,engine_rpm,tps_volt,tps_percent,ect_volt,ect_temp,"
+            "iat_volt,iat_temp,map_volt,map_pressure,reserved_0,reserved_1,"
+            "battery_volt,wheel_speed,fuel_injectors\n");
+
+    fprintf(
+            td1_file,
+            "timestamp,gear,reserved_0,reserved_1,reserved_2,engine_on\n");
+}
+
+static void log_csv_table_10(
+        const unsigned long long timestamp,
+        const hobd_table_10_s * const table,
+        FILE * const file)
+{
+    fprintf(
+            file,
+            "%llu,%u,%u,%u,%u,%u"
+            "%u,%u,%u,%u,%u,%u"
+            "%u,%u,%u\n",
+            timestamp,
+            (unsigned int) table->engine_rpm,
+            (unsigned int) table->tps_volt,
+            (unsigned int) table->tps_percent,
+            (unsigned int) table->ect_volt,
+            (unsigned int) table->ect_temp,
+            (unsigned int) table->iat_volt,
+            (unsigned int) table->iat_temp,
+            (unsigned int) table->map_volt,
+            (unsigned int) table->map_pressure,
+            (unsigned int) table->reserved_0,
+            (unsigned int) table->reserved_1,
+            (unsigned int) table->battery_volt,
+            (unsigned int) table->wheel_speed,
+            (unsigned int) table->fuel_injectors);
+}
+
+static void log_csv_table_d1(
+        const unsigned long long timestamp,
+        const hobd_table_d1_s * const table,
+        FILE * const file)
+{
+    fprintf(
+            file,
+            "%llu,%u,%u,%u,%u,%u\n",
+            timestamp,
+            (unsigned int) table->gear,
+            (unsigned int) table->reserved_0,
+            (unsigned int) table->reserved_1,
+            (unsigned int) table->reserved_2,
+            (unsigned int) table->engine_on);
+}
+
+static void log_csv_entry(
+        const mmc_entry_s * const entry,
+        FILE * const t10_file,
+        FILE * const td1_file)
+{
+    assert(entry != NULL);
+    assert(t10_file != NULL);
+    assert(td1_file != NULL);
+
+    if(entry->header.type == MMC_ENTRY_TYPE_HOBD_MSG)
+    {
+        const hobd_msg_s * const hobd_msg =
+                (const hobd_msg_s*) &entry->data[0];
+
+        if(hobd_msg->header.type == HOBD_MSG_TYPE_RESPONSE)
+        {
+            /* TODO - support both types */
+            if(hobd_msg->header.subtype == HOBD_MSG_SUBTYPE_TABLE_SUBGROUP)
+            {
+                const hobd_data_table_response_s * const resp =
+                        (const hobd_data_table_response_s*) &hobd_msg->data[0];
+
+                if(resp->table == HOBD_TABLE_10)
+                {
+                    log_csv_table_10(
+                            (unsigned long long) entry->header.timestamp,
+                            (const hobd_table_10_s*) &resp->data[0],
+                            t10_file);
+                }
+                else if(resp->table == HOBD_TABLE_D1)
+                {
+                    log_csv_table_d1(
+                            (unsigned long long) entry->header.timestamp,
+                            (const hobd_table_d1_s*) &resp->data[0],
+                            td1_file);
+                }
+            }
+        }
+    }
+}
+
 int main(
         int argc,
         char **argv)
@@ -200,17 +308,27 @@ int main(
     err = sigaction(SIGINT, &sigact, 0);
     assert(err == 0);
 
-    FILE * const file = fopen(DEFAULT_FILE_NAME, "rb");
-    assert(file != NULL);
+    FILE * const input_file = fopen(DEFAULT_FILE_NAME, "rb");
+    assert(input_file != NULL);
+
+    FILE * const t10_csv_file = fopen(DEFAULT_T10_CSV_FILE_NAME, "w+");
+    assert(t10_csv_file != NULL);
+
+    FILE * const td1_csv_file = fopen(DEFAULT_TD1_CSV_FILE_NAME, "w+");
+    assert(td1_csv_file != NULL);
+
+    log_csv_headers(t10_csv_file, td1_csv_file);
 
     while(g_exit_signaled == 0)
     {
-        const mmc_entry_s * const entry = read_next_entry(file);
+        const mmc_entry_s * const entry = read_next_entry(input_file);
 
         if(entry != NULL)
         {
             print_entry(entry_count, entry);
             entry_count += 1;
+
+            log_csv_entry(entry, t10_csv_file, td1_csv_file);
         }
 
         if((err != 0) || (entry == NULL))
@@ -219,9 +337,19 @@ int main(
         }
     }
 
-    if(file != NULL)
+    if(input_file != NULL)
     {
-        (void) fclose(file);
+        (void) fclose(input_file);
+    }
+
+    if(t10_csv_file != NULL)
+    {
+        (void) fclose(t10_csv_file);
+    }
+
+    if(td1_csv_file != NULL)
+    {
+        (void) fclose(td1_csv_file);
     }
 
     if(err == 0)

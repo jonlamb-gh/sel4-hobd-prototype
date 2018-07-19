@@ -25,6 +25,7 @@
 #include "thread.h"
 #include "sel4_mr.h"
 #include "time_server.h"
+#include "mmc_file.h"
 #include "mmc_entry.h"
 #include "mmc.h"
 #include "mmc_module.h"
@@ -49,11 +50,14 @@
 #define IPC_MSG_TYPE_RM_FILE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 5)
 #define IPC_MSG_TYPE_FILE_SIZE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 6)
 #define IPC_MSG_TYPE_FILE_SIZE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 7)
+#define IPC_MSG_TYPE_STATE_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 8)
+#define IPC_MSG_TYPE_STATE_SET_REQ IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 9)
+#define IPC_MSG_TYPE_STATE_RESP IPC_MSG_TYPE_ID(MMCMOD_BASE_BADGE, 10)
 
 static sdio_host_dev_t g_sdio_dev;
 static mmc_card_t g_mmc_card;
+static mmc_file_s g_mmc_file;
 
-static FL_FILE *g_file_handle;
 static sync_recursive_mutex_t g_fs_mutex;
 static uint32_t g_hard_flush_timeout_id;
 
@@ -61,8 +65,6 @@ static seL4_Word g_msg_rx_buffer[seL4_MsgMaxLength];
 
 static thread_s g_thread;
 static uint64_t g_thread_stack[MMCMOD_STACK_SIZE];
-
-static const char FILE_NAME[] = "/hobd.log";
 
 /* Align 'n' up to the value 'align', which must be a power of two. */
 static seL4_Word align_up(
@@ -72,7 +74,6 @@ static seL4_Word align_up(
     return (n + align - 1) & (~(align - 1));
 }
 
-#ifndef SIMULATION_BUILD
 /* FAT IO media API */
 static void fatio_lock(void)
 {
@@ -93,19 +94,23 @@ static int fatio_media_read(
         unsigned long sector_count)
 {
     int ret = FATIO_MEDIA_RW_SUCCESS;
+    const uint32_t enabled = mmc_file_get_enabled(&g_mmc_file);
 
-    const long bytes_read = mmc_block_read(
-            g_mmc_card,
-            sector,
-            (int) sector_count,
-            (void*) buffer,
-            0,
-            NULL,
-            NULL);
-
-    if(bytes_read != ((long) sector_count * FAT_SECTOR_SIZE))
+    if(enabled != 0)
     {
-        ret = FATIO_MEDIA_RW_FAILURE;
+        const long bytes_read = mmc_block_read(
+                g_mmc_card,
+                sector,
+                (int) sector_count,
+                (void*) buffer,
+                0,
+                NULL,
+                NULL);
+
+        if(bytes_read != ((long) sector_count * FAT_SECTOR_SIZE))
+        {
+            ret = FATIO_MEDIA_RW_FAILURE;
+        }
     }
 
     return ret;
@@ -118,90 +123,69 @@ static int fatio_media_write(
         unsigned long sector_count)
 {
     int ret = FATIO_MEDIA_RW_SUCCESS;
+    const uint32_t enabled = mmc_file_get_enabled(&g_mmc_file);
 
-    const long bytes_written = mmc_block_write(
-            g_mmc_card,
-            sector,
-            (int) sector_count,
-            (void*) buffer,
-            0,
-            NULL,
-            NULL);
-
-    if(bytes_written != ((long) sector_count * FAT_SECTOR_SIZE))
+    if(enabled != 0)
     {
-        ret = FATIO_MEDIA_RW_FAILURE;
+        const long bytes_written = mmc_block_write(
+                g_mmc_card,
+                sector,
+                (int) sector_count,
+                (void*) buffer,
+                0,
+                NULL,
+                NULL);
+
+        if(bytes_written != ((long) sector_count * FAT_SECTOR_SIZE))
+        {
+            ret = FATIO_MEDIA_RW_FAILURE;
+        }
     }
 
     return ret;
 }
 
-static void mmc_io_flush(
-        const uint32_t hard_flush)
-{
-    if(hard_flush != 0)
-    {
-        fl_fclose(g_file_handle);
-
-        g_file_handle = fl_fopen(FILE_NAME, "wba");
-        ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
-    }
-    else
-    {
-        const int err = fl_fflush(g_file_handle);
-        ZF_LOGF_IF(err != 0, "Failed to flush MMC IO");
-    }
-}
-#endif
-
 static void write_mmc_entry(
         const mmc_entry_s * const entry,
         const uint32_t hard_flush)
 {
-#ifndef SIMULATION_BUILD
-    ZF_LOGF_IF(g_file_handle == NULL, "MMC file handle is invalid");
-
     const uint16_t entry_size_bytes = mmc_entry_total_size(entry);
 
-    int err = fl_fwrite((void*) entry, 1, entry_size_bytes, g_file_handle);
-    ZF_LOGF_IF(err != (int) entry_size_bytes, "Failed to write entry to MMC");
+    const int err = mmc_file_write(
+            (void*) entry,
+            1,
+            entry_size_bytes,
+            &g_mmc_file);
+    ZF_LOGF_IF(err != 0, "Failed to write entry to MMC");
 
     if(hard_flush != 0)
     {
-        mmc_io_flush(1);
+        mmc_file_flush(1, &g_mmc_file);
     }
-#endif
 }
 
 static int hard_flush_timeout_cb(
         uintptr_t token)
 {
-#ifndef SIMULATION_BUILD
-    if(g_file_handle != NULL)
-    {
-        mmc_io_flush(1);
-    }
-#endif
+    mmc_file_flush(1, &g_mmc_file);
 
     return 0;
-
 }
 
 static void mmc_thread_fn(
         const seL4_CPtr ep_cap)
 {
+    int err;
     seL4_Word badge;
     mmc_stats_s stats = {0};
+
+    mmc_file_init(&g_mmc_file);
 
     /* initialize FAT IO library */
     fl_init();
 
 #ifndef SIMULATION_BUILD
-    int err;
-
-#ifdef MMCMOD_DEBUG
-    const unsigned long long card_cap = mmc_card_capacity(g_mmc_card);
-    MODLOGD("MMC capacity = %llu bytes", card_cap);
+    MODLOGD("MMC capacity = %llu bytes", mmc_card_capacity(g_mmc_card));
 #endif
 
     /* attach filesystem mutex functions */
@@ -209,12 +193,21 @@ static void mmc_thread_fn(
 
     /* attach media access functions */
     err = fl_attach_media(&fatio_media_read, &fatio_media_write);
+
+#ifdef SIMULATION_BUILD
+    ZF_LOGW_IF(
+            err != FAT_INIT_OK,
+            "Failed to attach FAT IO media access functions - "
+            "this is expected due to simulation build");
+#else
     ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to attach FAT IO media access functions");
+#endif
+
+    MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
     /* open the log file */
-    g_file_handle = fl_fopen(FILE_NAME, "wba");
-    ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
-#endif
+    err = mmc_file_open(&g_mmc_file);
+    ZF_LOGF_IF(err != 0, "Handling of MMC errors at runtime not yet implemented");
 
     time_server_alloc_id(&g_hard_flush_timeout_id);
 
@@ -224,8 +217,6 @@ static void mmc_thread_fn(
             g_hard_flush_timeout_id,
             &hard_flush_timeout_cb,
             0);
-
-    MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
     time_server_get_time(&stats.timestamp);
 
@@ -285,26 +276,16 @@ static void mmc_thread_fn(
 
             write_mmc_entry(entry, 0);
 
-            stats.entries_logged += 1;
+            if(g_mmc_file.enabled != 0)
+            {
+                stats.entries_logged += 1;
+            }
         }
         else if(msg_label == IPC_MSG_TYPE_FILE_SIZE_REQ)
         {
             uint32_t file_size = 0;
-            uint32_t cmd_status = 0;
 
-#ifndef SIMULATION_BUILD
-            fatio_lock();
-            if(g_file_handle != NULL)
-            {
-                file_size = (uint32_t) g_file_handle->filelength;
-            }
-            fatio_unlock();
-
-            if(file_size == 0)
-            {
-                cmd_status = 1;
-            }
-#endif
+            const uint32_t cmd_status = (uint32_t) mmc_file_size(&g_mmc_file, &file_size);
 
             const seL4_MessageInfo_t resp_info =
                     seL4_MessageInfo_new(IPC_MSG_TYPE_FILE_SIZE_RESP, 0, 0, 2);
@@ -316,23 +297,9 @@ static void mmc_thread_fn(
         }
         else if(msg_label == IPC_MSG_TYPE_RM_FILE_REQ)
         {
-            uint32_t cmd_status = 0;
-
             stats.entries_logged = 0;
 
-#ifndef SIMULATION_BUILD
-            fl_fclose(g_file_handle);
-
-            const int rm_status = fl_remove(FILE_NAME);
-
-            g_file_handle = fl_fopen(FILE_NAME, "wba");
-            ZF_LOGF_IF(g_file_handle == NULL, "Failed to open MMC file '%s'", FILE_NAME);
-
-            if(rm_status != 0)
-            {
-                cmd_status = 1;
-            }
-#endif
+            const uint32_t cmd_status = (uint32_t) mmc_file_rm(&g_mmc_file);
 
             const seL4_MessageInfo_t resp_info =
                     seL4_MessageInfo_new(IPC_MSG_TYPE_RM_FILE_RESP, 0, 0, 1);
@@ -341,16 +308,40 @@ static void mmc_thread_fn(
 
             seL4_Reply(resp_info);
         }
+        else if(msg_label == IPC_MSG_TYPE_STATE_REQ)
+        {
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_RESP, 0, 0, 1);
+
+            seL4_SetMR(0, (seL4_Word) mmc_file_get_enabled(&g_mmc_file));
+            seL4_Reply(resp_info);
+        }
+        else if(msg_label == IPC_MSG_TYPE_STATE_SET_REQ)
+        {
+            const seL4_MessageInfo_t resp_info =
+                    seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_RESP, 0, 0, 1);
+
+            const uint32_t desired_state = seL4_GetMR(0);
+
+            err = mmc_file_set_enabled(desired_state, &g_mmc_file);
+            if(err != 0)
+            {
+                ZF_LOGW(
+                        "Failed to change MMC file enabled state to %u - disabling",
+                        desired_state);
+                (void) mmc_file_set_enabled(0, &g_mmc_file);
+            }
+
+            seL4_SetMR(0, (seL4_Word) mmc_file_get_enabled(&g_mmc_file));
+            seL4_Reply(resp_info);
+        }
         else
         {
             ZF_LOGF("Invalid message label");
         }
     }
 
-    if(g_file_handle != NULL)
-    {
-        fl_fclose(g_file_handle);
-    }
+    (void) mmc_file_close(&g_mmc_file);
 
     /* cleanup and release FAT IO library */
     fl_shutdown();
@@ -371,7 +362,9 @@ static void init_mmc(
 {
     (void) memset(&g_mmc_card, 0, sizeof(g_mmc_card));
 
-#ifndef SIMULATION_BUILD
+#ifdef SIMULATION_BUILD
+    MODLOGD("skipping mmc_init() due to simulation build");
+#else
     const int err = mmc_init(&g_sdio_dev, &env->io_ops, &g_mmc_card);
     ZF_LOGF_IF(err != 0, "Failed to initialize MMC");
 #endif
@@ -573,4 +566,43 @@ int mmc_get_file_size(
     }
 
     return ret;
+}
+
+uint32_t mmc_set_state(
+        const uint32_t state)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_SET_REQ, 0, 0, 1);
+
+    seL4_SetMR(0, (seL4_Word) state);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
+}
+
+uint32_t mmc_get_state(void)
+{
+    const seL4_MessageInfo_t req_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_STATE_REQ, 0, 0, 0);
+
+    const seL4_MessageInfo_t resp_info = seL4_Call(g_thread.ipc_ep_cap, req_info);
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_label(resp_info) != IPC_MSG_TYPE_STATE_RESP,
+            "Invalid response lable");
+
+    ZF_LOGF_IF(
+            seL4_MessageInfo_get_length(resp_info) != 1,
+            "Invalid response length");
+
+    return (uint32_t) seL4_GetMR(0);
 }

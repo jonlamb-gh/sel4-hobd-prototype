@@ -56,7 +56,11 @@ static thread_s g_thread;
 static uint64_t g_thread_stack[CONSOLEMOD_STACK_SIZE];
 
 /* prototypes */
-static void handle_cli_cmd(const cli_cmd_kind cmd);
+static void handle_cli_cmd(
+        const cli_cmd_kind cmd);
+static void handle_cli_subcmd(
+        const cli_cmd_kind cmd,
+        const uint32_t subcmd_enum);
 
 /* microrl API */
 static void console_print(
@@ -83,14 +87,43 @@ static int console_exec(
         const char * const * argv)
 {
     /* arg0 is the command */
+    /* arg1 is an optional command and anything else */
     if(argc > 0)
     {
         cli_cmd_kind cmd;
-        const int status = cli_is_cmd(argv[0], &cmd);
+        const int cmd_status = cli_is_cmd(argv[0], &cmd);
 
-        if(status == CLI_IS_CMD_TRUE)
+        console_print("\n");
+
+        if(cmd_status == CLI_IS_CMD_TRUE)
         {
-            handle_cli_cmd(cmd);
+            const uint32_t subcmd_cnt = cli_get_subcmd_count(cmd);
+
+            if(subcmd_cnt == 0)
+            {
+                handle_cli_cmd(cmd);
+            }
+            else
+            {
+                if((argc < (int) 2) || (argv[1] == NULL))
+                {
+                    console_println("Invalid subcommand/arguments");
+                }
+                else
+                {
+                    uint32_t subcmd_enum = 0;
+                    const int subcmd_status = cli_is_subcmd(argv[1], cmd, &subcmd_enum);
+
+                    if(subcmd_status == CLI_IS_SUBCMD_TRUE)
+                    {
+                        handle_cli_subcmd(cmd, subcmd_enum);
+                    }
+                    else
+                    {
+                        console_println("Invalid subcommand/arguments");
+                    }
+                }
+            }
         }
         else
         {
@@ -99,15 +132,13 @@ static int console_exec(
         }
     }
 
-    /* TODO - args/options ? */
-
     return 0;
 }
 
 /* microrl API */
 static void console_sigint_handler(void)
 {
-    console_println("caught SIGINT");
+    /* TODO */
 }
 
 static void print_help(void)
@@ -120,6 +151,18 @@ static void print_help(void)
     {
         console_print(cli_get_cmd_str((cli_cmd_kind) idx));
         console_println(cli_get_cmd_desc_str((cli_cmd_kind) idx));
+
+        const uint32_t subcmd_cnt = cli_get_subcmd_count((cli_cmd_kind) idx);
+        const cli_subcmd_desc_s * const subcmds =
+                cli_get_subcmd_array((cli_cmd_kind) idx);
+
+        uint32_t subcmd_idx;
+        for(subcmd_idx = 0; (subcmd_idx < subcmd_cnt) && (subcmds != NULL); subcmd_idx += 1)
+        {
+            console_print("    ");
+            console_print(subcmds[subcmd_idx].subcmd);
+            console_println(subcmds[subcmd_idx].desc);
+        }
     }
 
     console_print("\n");
@@ -145,6 +188,8 @@ static void clear_console(void)
 static void handle_cli_cmd(
         const cli_cmd_kind cmd)
 {
+    char str[64];
+
     if(cmd == CLI_CMD_HELP)
     {
         print_help();
@@ -162,7 +207,6 @@ static void handle_cli_cmd(
         uint64_t time_ns;
         uint64_t time_sec;
         uint64_t time_min;
-        char time_str[32];
 
         time_server_get_time(&time_ns);
 
@@ -170,23 +214,21 @@ static void handle_cli_cmd(
         time_sec = (time_ns - (time_min * NS_IN_MINUTE)) / NS_IN_S;
 
         console_print("Current time: ");
-        (void) snprintf(time_str, sizeof(time_str), "%llu", time_ns);
-        console_print(time_str);
+        (void) snprintf(str, sizeof(str), "%llu", time_ns);
+        console_print(str);
         console_println(" ns");
 
         console_print("Elapsed: ");
-        (void) snprintf(time_str, sizeof(time_str), "%llu", time_min);
-        console_print(time_str);
+        (void) snprintf(str, sizeof(str), "%llu", time_min);
+        console_print(str);
         console_print(" min : ");
-        (void) snprintf(time_str, sizeof(time_str), "%llu", time_sec);
-        console_print(time_str);
+        (void) snprintf(str, sizeof(str), "%llu", time_sec);
+        console_print(str);
         console_println(" sec");
     }
-    else if(cmd == CLI_CMD_STATS)
+    else if(cmd == CLI_CMD_INFO)
     {
-        char str[32];
-
-        console_println("Statistics and Metrics");
+        console_println("Information, Statistics and Metrics");
 
         mmc_stats_s mmc_stats;
         mmc_get_stats(&mmc_stats);
@@ -197,6 +239,9 @@ static void handle_cli_cmd(
         console_println(str);
         console_print("  entries_logged: ");
         (void) snprintf(str, sizeof(str), "%u", mmc_stats.entries_logged);
+        console_println(str);
+        console_print("  enabled: ");
+        (void) snprintf(str, sizeof(str), "%u", mmc_get_state());
         console_println(str);
 
         hobd_stats_s hobd_stats;
@@ -225,38 +270,6 @@ static void handle_cli_cmd(
         (void) snprintf(str, sizeof(str), "%u", hobd_get_listen_only());
         console_println(str);
     }
-    else if(cmd == CLI_CMD_MMC_FILE_SIZE)
-    {
-        uint32_t file_size;
-        char str[32];
-
-        const int status = mmc_get_file_size(&file_size);
-
-        if(status == 0)
-        {
-            console_print("MMC file size: ");
-            (void) snprintf(str, sizeof(str), "%u", file_size);
-            console_print(str);
-            console_println(" bytes");
-        }
-        else
-        {
-            console_println("Failed to get MMC file size");
-        }
-    }
-    else if(cmd == CLI_CMD_MMC_RM)
-    {
-        const int status = mmc_rm();
-
-        if(status == 0)
-        {
-            console_println("Deleted the MMC file");
-        }
-        else
-        {
-            console_println("Failed to delete the MMC file");
-        }
-    }
     else if(cmd == CLI_CMD_DEBUG_SCHEDULER)
     {
 #ifdef CONFIG_DEBUG_BUILD
@@ -268,40 +281,134 @@ static void handle_cli_cmd(
         console_println("Must be a debug build to do so");
 #endif
     }
-    else if(cmd == CLI_CMD_HOBD_COMM_STATE)
-    {
-        const uint32_t state = hobd_get_comm_state();
-
-        if(state == 0)
-        {
-            console_println("Enabling HOBD comms");
-        }
-        else
-        {
-            console_println("Disabling HOBD comms");
-        }
-
-        (void) hobd_set_comm_state(!state);
-    }
-    else if(cmd == CLI_CMD_HOBD_COMM_LISTEN_ONLY)
-    {
-        const uint32_t state = hobd_get_listen_only();
-
-        if(state == 0)
-        {
-            console_println("Enabling listen-only mode");
-        }
-        else
-        {
-            console_println("Disabling listen-only mode");
-        }
-
-        (void) hobd_set_listen_only(!state);
-    }
     else
     {
         console_print(cli_get_cmd_str(cmd));
         console_println(": not yet supported");
+    }
+}
+
+static void handle_cli_subcmd(
+        const cli_cmd_kind cmd,
+        const uint32_t subcmd_enum)
+{
+    char str[64];
+
+    if(cmd == CLI_CMD_MMC)
+    {
+        const cli_mmc_subcmd_kind subcmd = (cli_mmc_subcmd_kind) subcmd_enum;
+
+        if(subcmd == CLI_MMC_SUBCMD_ON)
+        {
+            console_println("Enabling MMC file");
+
+            const uint32_t state = mmc_set_state(1);
+
+            console_print("MMC status: ");
+            (void) snprintf(str, sizeof(str), "%u", state);
+            console_println(str);
+        }
+        else if(subcmd == CLI_MMC_SUBCMD_OFF)
+        {
+            console_println("Disabling MMC file");
+
+            const uint32_t state = mmc_set_state(0);
+
+            console_print("MMC status: ");
+            (void) snprintf(str, sizeof(str), "%u", state);
+            console_println(str);
+        }
+        else if(subcmd == CLI_MMC_SUBCMD_STATUS)
+        {
+            console_print("MMC status: ");
+            (void) snprintf(str, sizeof(str), "%u", mmc_get_state());
+            console_println(str);
+        }
+        else if(subcmd == CLI_MMC_SUBCMD_FILE_SIZE)
+        {
+            uint32_t file_size;
+
+            const int status = mmc_get_file_size(&file_size);
+
+            if(status == 0)
+            {
+                console_print("MMC file size: ");
+                (void) snprintf(str, sizeof(str), "%u", file_size);
+                console_print(str);
+                console_println(" bytes");
+            }
+            else
+            {
+                console_println("Failed to get MMC file size");
+            }
+        }
+        else if(subcmd == CLI_MMC_SUBCMD_RM)
+        {
+            const int status = mmc_rm();
+
+            if(status == 0)
+            {
+                console_println("Deleted the MMC file");
+            }
+            else
+            {
+                console_println("Failed to delete the MMC file");
+            }
+        }
+    }
+    else if(cmd == CLI_CMD_HOBD)
+    {
+        const cli_hobd_subcmd_kind subcmd = (cli_hobd_subcmd_kind) subcmd_enum;
+
+        if(subcmd == CLI_HOBD_SUBCMD_ON)
+        {
+            console_println("Enabling HOBD comms");
+
+            const uint32_t state = hobd_set_comm_state(1);
+
+            console_print("HOBD comms status: ");
+            (void) snprintf(str, sizeof(str), "%u", state);
+            console_println(str);
+        }
+        else if(subcmd == CLI_HOBD_SUBCMD_OFF)
+        {
+            console_println("Disabling HOBD comms");
+
+            const uint32_t state = hobd_set_comm_state(0);
+
+            console_print("HOBD comms status: ");
+            (void) snprintf(str, sizeof(str), "%u", state);
+            console_println(str);
+        }
+        else if(subcmd == CLI_HOBD_SUBCMD_STATUS)
+        {
+            console_print("HOBD comms status: ");
+            (void) snprintf(str, sizeof(str), "%u", hobd_get_comm_state());
+            console_println(str);
+
+            console_print("HOBD comms listen-only: ");
+            (void) snprintf(str, sizeof(str), "%u", hobd_get_listen_only());
+            console_println(str);
+        }
+        else if(subcmd == CLI_HOBD_SUBCMD_PASSIVE)
+        {
+            const uint32_t state = hobd_get_listen_only();
+
+            if(state == 0)
+            {
+                console_println("Enabling listen-only mode");
+            }
+            else
+            {
+                console_println("Disabling listen-only mode");
+            }
+
+            const uint32_t new_state = hobd_set_listen_only(!state);
+
+            console_print("HOBD comms listen-only: ");
+            (void) snprintf(str, sizeof(str), "%u", new_state);
+            console_println(str);
+        }
     }
 }
 

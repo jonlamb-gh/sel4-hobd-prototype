@@ -35,6 +35,7 @@ execute_process(
 add_executable(
     hobd-system
     modules/time_server/src/time_server_module.c
+    modules/mmc/src/mmc_file.c
     modules/mmc/src/mmc_module.c
     modules/console/src/cli.c
     modules/console/src/console_module.c

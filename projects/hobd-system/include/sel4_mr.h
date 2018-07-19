@@ -24,7 +24,16 @@ static inline void sel4_mr_recv(
 
     for(idx = 0; idx < size_words; idx += 1)
     {
-        buffer[idx] = (uint32_t) ipc->msg[idx];
+        /* buffer[idx] = (uint32_t) ipc->msg[idx]; */
+
+        if(idx <= 3)
+        {
+            buffer[idx] = (uint32_t) seL4_GetMR(idx);
+        }
+        else
+        {
+            buffer[idx] = (uint32_t) ipc->msg[idx];
+        }
     }
 }
 

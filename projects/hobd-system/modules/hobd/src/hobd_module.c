@@ -91,6 +91,8 @@ static void send_ecu_diag_messages(void)
 
     hobd_msg_s * const msg = (hobd_msg_s*) &g_msg_tx_buffer[0];
 
+    hobd_parser_reset(&g_msg_parser);
+
     /* create a wake up message */
     (void) hobd_msg_no_data(
             HOBD_MSG_TYPE_WAKE_UP,
@@ -100,15 +102,12 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 
     /* TESTING - log tx messages */
-    if(g_comm.listen_only == 0)
-    {
-        mmc_log_entry_data(
-                MMC_ENTRY_TYPE_HOBD_MSG,
-                HOBD_MSG_HEADERCS_SIZE,
-                NULL,
-                &g_msg_tx_buffer[0],
-                0);
-    }
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE,
+            NULL,
+            &g_msg_tx_buffer[0],
+            0);
 
     ps_mdelay(1);
 
@@ -123,15 +122,12 @@ static void send_ecu_diag_messages(void)
     comm_send_msg(msg, &g_comm);
 
     /* TESTING - log tx messages */
-    if(g_comm.listen_only == 0)
-    {
-        mmc_log_entry_data(
-                MMC_ENTRY_TYPE_HOBD_MSG,
-                HOBD_MSG_HEADERCS_SIZE + 1,
-                NULL,
-                &g_msg_tx_buffer[0],
-                0);
-    }
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            HOBD_MSG_HEADERCS_SIZE + 1,
+            NULL,
+            &g_msg_tx_buffer[0],
+            0);
 }
 
 static void send_table_req(
@@ -155,15 +151,12 @@ static void send_table_req(
     comm_send_msg(tx_msg, &g_comm);
 
     /* TESTING - log tx messages */
-    if(g_comm.listen_only == 0)
-    {
-        mmc_log_entry_data(
-                MMC_ENTRY_TYPE_HOBD_MSG,
-                (uint16_t) tx_msg->header.size,
-                NULL,
-                (const uint8_t*) tx_msg,
-                0);
-    }
+    mmc_log_entry_data(
+            MMC_ENTRY_TYPE_HOBD_MSG,
+            (uint16_t) tx_msg->header.size,
+            NULL,
+            (const uint8_t*) tx_msg,
+            0);
 }
 
 static void comm_update_state(
@@ -273,6 +266,7 @@ static void obd_comm_thread_fn(
 {
     int err;
     seL4_Word badge;
+    uint64_t timestamp;
     hobd_stats_s stats = {0};
 
     /* wait for system ready */
@@ -297,6 +291,18 @@ static void obd_comm_thread_fn(
             &g_comm.gpio_uart_tx);
     ZF_LOGF_IF(err != 0, "Failed to initialize GPIO port/pin");
 
+    /* reconfigure the serial port if starting in listen-only mode */
+    if(g_comm.listen_only != 0)
+    {
+        err = serial_configure(
+                &g_comm.char_dev,
+                HOBD_KLINE_BAUD,
+                8,
+                PARITY_NONE,
+                1);
+        ZF_LOGF_IF(err != 0, "Failed to configure serial port");
+    }
+
     MODLOGD(HOBDMOD_THREAD_NAME " thread is running");
 
     g_comm.state = COMM_STATE_GPIO_INIT;
@@ -307,8 +313,25 @@ static void obd_comm_thread_fn(
 
         if(g_comm.enabled != 0)
         {
-            /* update comms and perform a non-blocking EP recv if enabled */
-            comm_update_state(&stats);
+            if(g_comm.listen_only == 0)
+            {
+                /* update comms and perform a non-blocking EP recv if enabled */
+                comm_update_state(&stats);
+            }
+            else
+            {
+                /* log any messages seen on the k-line */
+                const hobd_msg_s * const hobd_msg = comm_recv_msg(
+                        1,
+                        &g_msg_parser,
+                        &g_comm);
+
+                if(hobd_msg != NULL)
+                {
+                    time_server_get_time(&timestamp);
+                    new_hobd_msg_callback(hobd_msg, &timestamp);
+                }
+            }
 
             info = seL4_NBRecv(
                     ep_cap,
@@ -377,8 +400,10 @@ static void obd_comm_thread_fn(
                 }
                 else
                 {
+                    hobd_parser_reset(&g_msg_parser);
                     g_comm.enabled = 1;
                 }
+
 
                 seL4_SetMR(0, (seL4_Word) g_comm.enabled);
                 seL4_Reply(resp_info);
@@ -414,6 +439,8 @@ static void obd_comm_thread_fn(
                 {
                     g_comm.listen_only = 1;
                 }
+
+                hobd_parser_reset(&g_msg_parser);
 
                 seL4_SetMR(0, (seL4_Word) g_comm.listen_only);
                 seL4_Reply(resp_info);
@@ -464,6 +491,7 @@ void hobd_module_init(
 {
     /* TODO - init_comm */
     g_comm.enabled = 0;
+    g_comm.listen_only = 1;
 
     init_gpio(env);
     init_uart(env);

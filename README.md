@@ -199,6 +199,36 @@ tx_msg[02:0C:72]
 ...
 ```
 
+## Console
+
+Press enter to get the console prompt:
+
+```bash
+IRin > help
+```
+
+```bash
+--- console ---
+commands:
+help           - print this help message
+version        - print version information
+clear          - clear the screen
+time           - get the current time
+info           - print module info, statistics and metrics
+debug-sched    - print the kernel scheduler information
+mmc <subcmd>   - MMC module and file ops
+    on         - enable MMC module file logging
+    off        - disable MMC module file logging
+    status     - get MMC module status
+    size       - get the curent MMC file size
+    rm         - delete the current MMC file
+hobd <subcmd>  - HOBD and subsystems
+    on         - enable HOBD K-line comms
+    off        - disable HOBD K-line comms
+    status     - get HOBD comms module status
+    passive    - toggle HOBD comms listen-only mode
+```
+
 ## Diagrams
 
 ### Wiring
