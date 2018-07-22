@@ -43,6 +43,12 @@ tree build/images/
 
 Simulation features are enabled by default via `BuildWithCommonSimulationSettings`.
 
+```bash
+cd build/
+
+./simulate
+```
+
 Mounting the SD card image file used during QEMU simulation:
 
 ```bash
