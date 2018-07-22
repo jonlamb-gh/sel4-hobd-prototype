@@ -18,7 +18,6 @@ See the [devel](https://github.com/jonlamb-gh/sel4-hobd-prototype/tree/devel) br
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
 - [HW user manual](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/SABRE_Lite_Hardware_Manual_rev11.pdf)
 - [HW components](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/sabre_lite-revD.pdf)
-- [GPIO mapping guide](https://www.kosagi.com/w/index.php?title=Definitive_GPIO_guide)
 - [Honda OBD Data tables](http://projects.gonzos.net/wp-content/uploads/2015/09/Honda-data-tables.pdf)
 
 ## Project Files
@@ -48,6 +47,9 @@ cd build/
 
 ./simulate
 ```
+
+The SD card image is created during the CMake configuration with
+this [script](scripts/create-sdcard-img).
 
 Mounting the SD card image file used during QEMU simulation:
 
@@ -134,7 +136,7 @@ telnet 127.0.0.1 1235
 echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 ```
 
-## Running on Hardward
+## Running on Hardware
 
 Example U-boot command:
 
