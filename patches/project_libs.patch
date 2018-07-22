@@ -1,3 +1,27 @@
+diff --git a/libsdhcdrivers/src/mmc.c b/libsdhcdrivers/src/mmc.c
+index 19cf9d0..fea7459 100644
+--- a/libsdhcdrivers/src/mmc.c
++++ b/libsdhcdrivers/src/mmc.c
+@@ -434,7 +434,8 @@ mmc_block_read(mmc_card_t mmc_card, unsigned long start,
+     if (mmc_card->high_capacity) {
+         arg = start;
+     } else {
+-        arg = start + bs;
++        /*arg = start + bs;*/
++        arg = start * bs;
+     }
+     /* Allocate command structure */
+     cmd = mmc_cmd_new(MMC_READ_SINGLE_BLOCK, arg, MMC_RSP_TYPE_R1);
+@@ -482,7 +483,8 @@ mmc_block_write(mmc_card_t mmc_card, unsigned long start, int nblocks,
+     if (mmc_card->high_capacity) {
+         arg = start;
+     } else {
+-        arg = start + bs;
++        /*arg = start + bs;*/
++        arg = start * bs;
+     }
+     /* Allocate command structure */
+     cmd = mmc_cmd_new(MMC_WRITE_BLOCK, arg, MMC_RSP_TYPE_R1);
 diff --git a/libsdhcdrivers/src/sdhc.c b/libsdhcdrivers/src/sdhc.c
 index c991fcb..d7ce0f4 100644
 --- a/libsdhcdrivers/src/sdhc.c

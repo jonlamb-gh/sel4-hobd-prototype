@@ -10,10 +10,11 @@ Supported platforms:
 
 - Sabre Lite IMx6, quad core A9
 
-See the `devel` branch for the most recent developments.
+See the [devel](https://github.com/jonlamb-gh/sel4-hobd-prototype/tree/devel) branch for the most recent developments.
 
 ## Links
 
+- [seL4 manual](https://sel4.systems/Info/Docs/seL4-manual-latest.pdf)
 - [IMX6 RM](http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
 - [HW user manual](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/SABRE_Lite_Hardware_Manual_rev11.pdf)
 - [HW components](https://1quxc51443zg3oix7e35dnvg-wpengine.netdna-ssl.com/wp-content/uploads/2014/11/sabre_lite-revD.pdf)
@@ -22,13 +23,11 @@ See the `devel` branch for the most recent developments.
 
 ## Project Files
 - [CMake config for this project](configs/imx6_sabre_lite.cmake)
-- [Main project root directory](projects/hobd_system)
-- [ECU data generator tool](testing_tools/fake_hobd_ecu_data/README.md)
+- [Main project root directory](projects/hobd-system)
+- [ECU data generator tool](testing-tools/fake-hobd-ecu-data/README.md)
 - [MMC entry log file dump tool](testing-tools/hobd-log-entry-dump/README.md)
 
 ## Building
-
-TODO - `SIMULATION_BUILD` feature gating
 
 ```bash
 # also runs `git submodule update --init`
@@ -50,7 +49,7 @@ following (note that it must be >= `KernelMaxNumNodes`):
 -smp cores=4
 ```
 
-Affinity for the threads used in this project are in [config.h](projects/hobd_system/include/config.h).
+Affinity for the threads used in this project are in [config.h](projects/hobd-system/include/config.h).
 
 ## GPIO
 
@@ -176,7 +175,7 @@ stats      - print module statistics and metrics
 mmc-size   - get current MMC file size
 mmc-rm     - delete the current MMC file
 
-IRin > 
+IRin >
 ```
 
 Running the [fake-hobd-ecu-data](testing-tools/fake-hobd-ecu-data/README.md) tool:

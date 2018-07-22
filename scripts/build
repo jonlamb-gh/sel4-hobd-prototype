@@ -2,14 +2,22 @@
 
 set -e
 
-mkdir -p build/
+BUILD_TYPE="Debug"
 
+if [ $1 == "release" ]; then
+    BUILD_TYPE="Release"
+fi
+
+echo "Build type: $BUILD_TYPE"
+
+mkdir -p build/
 cd build/
 
 cmake \
     -C../configs/imx6_sabre_lite.cmake \
     -DCROSS_COMPILER_PREFIX=arm-linux-gnueabihf- \
     -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -G Ninja ..
 
 cmake ..

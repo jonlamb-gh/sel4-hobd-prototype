@@ -17,6 +17,7 @@
 #include "ipc_util.h"
 #include "init_env.h"
 #include "thread.h"
+#include "time_server.h"
 #include "mmc_entry.h"
 #include "mmc.h"
 #include "system_module.h"
@@ -28,13 +29,19 @@
 #endif
 
 #define HEARTBEAT_DELAY_SEC (4)
+#define HEARTBEAT_TIMEOUT_NS S_TO_NS(HEARTBEAT_DELAY_SEC)
 
 #define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(SYSMOD_BASE_BADGE)
 
+#define IPC_MSG_TYPE_TIMEOUT IPC_MSG_TYPE_ID(SYSMOD_BASE_BADGE, 1)
+
+static volatile seL4_Word g_is_init = 0;
+static sync_mutex_t g_sys_ready_mutex;
+
+static uint32_t g_timeout_id;
+
 static thread_s g_thread;
 static uint64_t g_thread_stack[SYSMOD_STACK_SIZE];
-static sync_mutex_t g_sys_ready_mutex;
-static volatile seL4_Word g_is_init = 0;
 
 static void signal_ready_to_start(void)
 {
@@ -44,10 +51,23 @@ static void signal_ready_to_start(void)
     MODLOGD("System starting");
 }
 
+static int timeout_cb(
+        uintptr_t token)
+{
+    const seL4_MessageInfo_t msg_info =
+            seL4_MessageInfo_new(IPC_MSG_TYPE_TIMEOUT, 0, 0, 0);
+
+    /* non-blocking so this won't block the time server */
+    seL4_NBSend(g_thread.ipc_ep_cap, msg_info);
+
+    return 0;
+}
+
 static void sys_thread_fn(
         const seL4_CPtr ep_cap)
 {
     int err;
+    seL4_Word badge;
 
     /* setup the system-ready mutex mechanism */
     if(g_is_init == 0)
@@ -60,21 +80,41 @@ static void sys_thread_fn(
         g_is_init = 1;
     }
 
+    time_server_alloc_id(&g_timeout_id);
+
+    time_server_register_periodic_cb(
+            HEARTBEAT_TIMEOUT_NS,
+            0,
+            g_timeout_id,
+            &timeout_cb,
+            0);
+
     /* start the system, enabling any blocked threads on our mutex */
     signal_ready_to_start();
 
+    /* forfeit remainder of our time slice */
+    seL4_Yield();
+
     while(1)
     {
-        /* log a heartbeat entry, non-blocking true so it could be dropped */
-        mmc_log_entry_data(
-                MMC_ENTRY_TYPE_HEARTBEAT,
-                0,
-                NULL,
-                NULL,
-                1);
+        const seL4_MessageInfo_t info = seL4_Recv(
+                ep_cap,
+                &badge);
 
-        /* TODO - replace rough delay with periodic timer and endpoint */
-        ps_sdelay(HEARTBEAT_DELAY_SEC);
+        ZF_LOGF_IF(badge != ENDPOINT_BADGE, "Invalid IPC badge");
+
+        const seL4_Word msg_label = seL4_MessageInfo_get_label(info);
+
+        if(msg_label == IPC_MSG_TYPE_TIMEOUT)
+        {
+            /* log a heartbeat entry, non-blocking true so it could be dropped */
+            mmc_log_entry_data(
+                    MMC_ENTRY_TYPE_HEARTBEAT,
+                    0,
+                    NULL,
+                    NULL,
+                    1);
+        }
     }
 
     /* should not get here, intentional halt */

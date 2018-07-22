@@ -32,7 +32,8 @@
 #define MODLOGD(...)
 #endif
 
-#define MAX_TIMEOUTS (2)
+/* TODO - move this to config.h ? */
+#define MAX_TIMEOUTS (3)
 
 #define ENDPOINT_BADGE IPC_ENDPOINT_BADGE(TMSERVERMOD_BASE_BADGE)
 

@@ -400,10 +400,11 @@ static void obd_comm_thread_fn(
                 }
                 else
                 {
-                    hobd_parser_reset(&g_msg_parser);
                     g_comm.enabled = 1;
                 }
 
+                hobd_parser_reset(&g_msg_parser);
+                g_comm.state = COMM_STATE_GPIO_INIT;
 
                 seL4_SetMR(0, (seL4_Word) g_comm.enabled);
                 seL4_Reply(resp_info);
@@ -441,6 +442,7 @@ static void obd_comm_thread_fn(
                 }
 
                 hobd_parser_reset(&g_msg_parser);
+                g_comm.state = COMM_STATE_GPIO_INIT;
 
                 seL4_SetMR(0, (seL4_Word) g_comm.listen_only);
                 seL4_Reply(resp_info);

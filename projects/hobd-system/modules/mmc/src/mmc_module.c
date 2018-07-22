@@ -184,8 +184,9 @@ static void mmc_thread_fn(
     /* initialize FAT IO library */
     fl_init();
 
-#ifndef SIMULATION_BUILD
-    MODLOGD("MMC capacity = %llu bytes", mmc_card_capacity(g_mmc_card));
+#ifdef MMCMOD_DEBUG
+    const uint64_t mmc_cap = mmc_card_capacity(g_mmc_card);
+    MODLOGD("MMC capacity = %llu bytes - %llu MB", mmc_cap, mmc_cap / (1024UL * 1024ULL));
 #endif
 
     /* attach filesystem mutex functions */
@@ -193,15 +194,7 @@ static void mmc_thread_fn(
 
     /* attach media access functions */
     err = fl_attach_media(&fatio_media_read, &fatio_media_write);
-
-#ifdef SIMULATION_BUILD
-    ZF_LOGW_IF(
-            err != FAT_INIT_OK,
-            "Failed to attach FAT IO media access functions - "
-            "this is expected due to simulation build");
-#else
     ZF_LOGF_IF(err != FAT_INIT_OK, "Failed to attach FAT IO media access functions");
-#endif
 
     MODLOGD(MMCMOD_THREAD_NAME " thread is running");
 
@@ -232,7 +225,11 @@ static void mmc_thread_fn(
 
     /* write the begin of log marker */
     write_mmc_entry(&begin_entry_marker, 1);
-    stats.entries_logged += 1;
+
+    if(g_mmc_file.enabled != 0)
+    {
+        stats.entries_logged += 1;
+    }
 
     /* receive MMC entries via IPC endpoint, write them to the MMC FAT filesystem */
     while(1)
@@ -360,14 +357,8 @@ static void init_sdio(
 static void init_mmc(
         init_env_s * const env)
 {
-    (void) memset(&g_mmc_card, 0, sizeof(g_mmc_card));
-
-#ifdef SIMULATION_BUILD
-    MODLOGD("skipping mmc_init() due to simulation build");
-#else
     const int err = mmc_init(&g_sdio_dev, &env->io_ops, &g_mmc_card);
     ZF_LOGF_IF(err != 0, "Failed to initialize MMC");
-#endif
 }
 
 void mmc_module_init(

@@ -4,6 +4,12 @@ project(hobd-system C)
 
 set(configure_string "")
 
+set(
+    BuildWithCommonSimulationSettings
+    ON
+    CACHE BOOL
+    "Include only simulation compatible configurations")
+
 config_option(
     UserDebugBuild
     USER_DEBUG_BUILD
@@ -11,25 +17,46 @@ config_option(
     DEFAULT ON
 )
 
-# enable all 4 cores in QEMU
-set(QemuFlags "-smp cores=4")
-
-ApplyCommonSimulationSettings()
+if(BuildWithCommonSimulationSettings)
+    # enable all 4 cores
+    set(QemuFlags "-smp cores=4")
+    # add SD card parameters
+    list(
+        APPEND QemuFlags
+        "-drive file=sddisk.img,format=raw,id=sdcard -device sd-card,drive=sdcard")
+    ApplyCommonSimulationSettings()
+    GenerateSimulateScript()
+endif()
 
 ApplyData61ElfLoaderSettings()
 
+if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    set(KernelPrinting OFF CACHE BOOL "" FORCE)
+    set(KernelDebugBuild OFF CACHE BOOL "" FORCE)
+    set(LibSel4PlatSupportUseDebugPutChar OFF CACHE BOOL "" FORCE)
+else()
+    set(KernelPrinting ON CACHE BOOL "" FORCE)
+    set(KernelDebugBuild ON CACHE BOOL "" FORCE)
+    set(LibSel4PlatSupportUseDebugPutChar ON CACHE BOOL "" FORCE)
+endif()
+
 execute_process(
-  COMMAND git rev-parse --abbrev-ref HEAD
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_BRANCH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
 execute_process(
-  COMMAND git describe
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_REVISION
-  OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND git describe
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_REVISION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+execute_process(
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/create-sdcard-img
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_executable(
@@ -116,5 +143,3 @@ target_link_libraries(
     microrl)
 
 DeclareRootserver(hobd-system)
-
-GenerateSimulateScript()

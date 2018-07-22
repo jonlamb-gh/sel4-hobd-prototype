@@ -97,12 +97,7 @@ void mmc_file_init(
     file->ref = NULL;
     file->is_init = IS_INIT_VALUE;
 
-#ifdef SIMULATION_BUILD
-    file->enabled = 0;
-    MODLOGD("disabling MMC file due to simulation build");
-#else
     file->enabled = 1;
-#endif
 }
 
 int mmc_file_open(
@@ -141,21 +136,29 @@ int mmc_file_set_enabled(
 {
     int ret = init_check(file, DONT_CHECK_FILE);
 
-    if(enabled == 0)
+    if(ret == MMC_FILE_ERR_OK)
     {
-        /* disable if not already */
-        if(file->enabled != 0)
+        if(enabled == 0)
         {
-            file->enabled = 0;
+            /* disable if not already */
+            if(file->enabled != 0)
+            {
+                file->enabled = 0;
 
-            MODLOGD("Disabling MMC file");
-            mmc_fclose(file);
+                MODLOGD("Disabling MMC file");
+                mmc_fclose(file);
+            }
         }
-    }
-    else
-    {
-        ZF_LOGF("MMC file enabling not yet implemented");
-        ret = MMC_FILE_ERR_FS;
+        else
+        {
+            ret = mmc_fopen(file);
+
+            if(ret == MMC_FILE_ERR_OK)
+            {
+                MODLOGD("Enabling MMC file");
+                file->enabled = 1;
+            }
+        }
     }
 
     return ret;

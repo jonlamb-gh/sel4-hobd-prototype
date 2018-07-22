@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -e
+
+rm -f sddisk.img
+
+qemu-img create -f raw sddisk.img 100M
+
+# FAT32 partition
+echo ',,b;' | sfdisk sddisk.img
+
+mkfs.vfat -F 32 -S 512 sddisk.img
+
+sfdisk -l sddisk.img
+
+exit 0

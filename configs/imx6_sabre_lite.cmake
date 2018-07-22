@@ -11,10 +11,7 @@ set(KernelFastpath ON CACHE BOOL "")
 set(ElfloaderImage "elf" CACHE STRING "")
 
 set(KernelVerificationBuild OFF CACHE BOOL "" FORCE)
-set(LibSel4PlatSupportUseDebugPutChar true CACHE BOOL "")
-set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(LibUtilsDefaultZfLogLevel "0" CACHE STRING "" FORCE)
-set(KernelDebugBuild ON CACHE BOOL "" FORCE)
 
 set(KernelMaxNumNodes "4" CACHE STRING "")
 set(KernelNumDomains 1 CACHE STRING "")
