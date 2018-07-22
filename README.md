@@ -134,7 +134,7 @@ telnet 127.0.0.1 1235
 echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 ```
 
-## Output
+## Running on Hardward
 
 Example U-boot command:
 
@@ -184,39 +184,6 @@ init debug_print_bootinfo@bootinfo.c:44 0x101ac000 | 14 | 0
 ...
 2 untypeds of size 27
 ------------------------------
-
-platform_init@platform.c:96 Platform is initialized
-root_task_init@root_task.c:105 Created global fault ep 0x29F
-root_task_init@root_task.c:107 Root task is initialized
-thread_create@thread.c:149 Created thread 'time-server' - stack size 4096 bytes
-thread_create@thread.c:149 Created thread 'mmc' - stack size 4096 bytes
-thread_create@thread.c:149 Created thread 'console' - stack size 8192 bytes
-thread_create@thread.c:149 Created thread 'hobd-comm' - stack size 8192 bytes
-thread_create@thread.c:149 Created thread 'sys' - stack size 4096 bytes
-debug_dump_scheduler@main.c:54 Dumping scheduler (only core 0 TCBs will be displayed)
-
-Dumping all tcbs!
-Name                                            State           IP          Prio    Core
---------------------------------------------------------------------------------------
-sys                                             running         0x52e20     255     0
-console                                         running         0x52df8     255     0
-idle_thread                                     idle            (nil)       0       0
-init                                            running         0x1fa88     255     0
-
-(press enter to get the console prompt)
-
-IRin > help
---- hobd console ---
-commands:
-help       - print this help message
-version    - print version information
-clear      - clear the screen
-time       - get the current time
-stats      - print module statistics and metrics
-mmc-size   - get current MMC file size
-mmc-rm     - delete the current MMC file
-
-IRin >
 ```
 
 Running the [fake-hobd-ecu-data](testing-tools/fake-hobd-ecu-data/README.md) tool:
