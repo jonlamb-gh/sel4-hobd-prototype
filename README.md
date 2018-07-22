@@ -34,6 +34,41 @@ See the [devel](https://github.com/jonlamb-gh/sel4-hobd-prototype/tree/devel) br
 ./scripts/apply-patches
 
 ./scripts/build
+
+tree build/images/
+└── hobd-system-image-arm-imx6
+```
+
+## Simulation
+
+Simulation features are enabled by default via `BuildWithCommonSimulationSettings`.
+
+Mounting the SD card image file used during QEMU simulation:
+
+```bash
+cd build/
+
+sfdisk -l /dev/loop0
+
+losetup /dev/loop0 sddisk.img
+
+sfdisk -l /dev/loop0
+
+    Disk /dev/loop0: 100 MiB, 104857600 bytes, 204800 sectors
+    Units: sectors of 1 * 512 = 512 bytes
+    Sector size (logical/physical): 512 bytes / 512 bytes
+    I/O size (minimum/optimal): 512 bytes / 512 bytes
+    Disklabel type: dos
+    Disk identifier: 0x00000000
+
+sudo mount -t vfat /dev/loop0 /mnt/path
+
+tree /mnt/path
+└── hobd.log
+
+sudo umount /mnt/path
+
+losetup -d /dev/loop0
 ```
 
 ## SMP / Multicore
