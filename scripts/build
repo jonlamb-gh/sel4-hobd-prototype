@@ -2,11 +2,7 @@
 
 set -e
 
-BUILD_TYPE="Debug"
-
-if [ $1 == "release" ]; then
-    BUILD_TYPE="Release"
-fi
+BUILD_TYPE=${1:-"Debug"}
 
 echo "Build type: $BUILD_TYPE"
 

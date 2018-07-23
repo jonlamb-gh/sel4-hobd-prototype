@@ -71,4 +71,8 @@
 #endif
 */
 
+#ifndef CONFIG_DEBUG_BUILD
+#define seL4_DebugHalt()
+#endif
+
 #endif /* CONFIG_H */

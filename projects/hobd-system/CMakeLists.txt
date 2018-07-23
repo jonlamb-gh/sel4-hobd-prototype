@@ -8,7 +8,7 @@ set(
     BuildWithCommonSimulationSettings
     ON
     CACHE BOOL
-    "Include only simulation compatible configurations")
+    "Include common simulation compatible configurations and utilities")
 
 config_option(
     UserDebugBuild
@@ -33,11 +33,15 @@ ApplyData61ElfLoaderSettings()
 if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
     set(KernelPrinting OFF CACHE BOOL "" FORCE)
     set(KernelDebugBuild OFF CACHE BOOL "" FORCE)
+    set(UserDebugBuild OFF CACHE BOOL "" FORCE)
     set(LibSel4PlatSupportUseDebugPutChar OFF CACHE BOOL "" FORCE)
+    set(LibUtilsDefaultZfLogLevel "5" CACHE STRING "" FORCE)
 else()
     set(KernelPrinting ON CACHE BOOL "" FORCE)
     set(KernelDebugBuild ON CACHE BOOL "" FORCE)
+    set(UserDebugBuild ON CACHE BOOL "" FORCE)
     set(LibSel4PlatSupportUseDebugPutChar ON CACHE BOOL "" FORCE)
+    set(LibUtilsDefaultZfLogLevel "0" CACHE STRING "" FORCE)
 endif()
 
 execute_process(
