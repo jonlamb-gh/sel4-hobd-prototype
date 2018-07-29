@@ -141,6 +141,12 @@ echo -ne '\x02\x04\x00\xFA'  > /dev/tcp/127.0.0.1/1235
 Example U-boot command:
 
 ```bash
+=> print loadaddr
+loadaddr=0x12000000
+
+=> print imgname
+imgname=hobd-system-image-arm-imx6
+
 setenv bootsel4 'tftp ${loadaddr} ${serverip}:${imgname}; dcache flush; dcache off; bootelf'
 
 run bootsel4
